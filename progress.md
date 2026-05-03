@@ -284,7 +284,13 @@
 ## Error Log
 | Timestamp | Error | Attempt | Resolution |
 |-----------|-------|---------|------------|
-|           |       | 1       |            |
+| 2026-04-30 02:45 | MCP error -32000: createDependency not exported | 1 | 编译后代码导出问题，Node.js v24 需要明确重命名 |
+| 2026-04-30 02:50 | MCP error: indexAssetContent not exported | 2 | 在 assets.ts 中添加重新导出 `export { indexAssetContent } from './search.js'` |
+| 2026-04-30 02:54 | MCP error: registerExportTools not defined | 3 | 在 index.ts 添加缺失的 `import { registerExportTools }` 和 `import { registerDependencyTools }` |
+| 2026-04-30 02:55 | MCP error: archiver package not found | 4 | 修复 package.json 中 archiver 版本 ^7.1.1 → ^7.0.1 |
+| 2026-04-30 02:57 | MCP error: exportAsJson not exported from zip.js | 5 | 在 zip.ts 末尾添加别名导出 `export const exportAsJson = exportAllToJson` 等 |
+| 2026-04-30 12:53 | TypeScript 编译错误：重复导出批量函数 | 6 | 移除 assets.ts 中重复的批量函数定义，保留异步版本 |
+| 2026-04-30 12:53 | TypeScript 编译错误：缺少 common.js | 7 | 创建 src/tools/common.ts 公共类型文件 |
 
 ## 5-Question Reboot Check
 | Question | Answer |

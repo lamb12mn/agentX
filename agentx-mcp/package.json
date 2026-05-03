@@ -1,7 +1,7 @@
 {
   "name": "agentx-mcp",
-  "version": "1.0.0",
-  "description": "Local-first agent factory MCP Server for Claude Code",
+  "version": "2.0.0",
+  "description": "Local-first agent factory MCP Server for Claude Code with enhanced features",
   "type": "module",
   "bin": {
     "agentx-mcp": "./dist/index.js",
@@ -17,17 +17,25 @@
   },
   "scripts": {
     "build": "tsc",
+    "build:enhanced": "tsc --project tsconfig.enhanced.json",
     "start": "node dist/index.js",
+    "start:enhanced": "node dist/index-enhanced.js",
     "test": "vitest run",
-    "prepublishOnly": "npm run build && npm test"
+    "test:enhanced": "vitest run --config vitest.enhanced.config.ts",
+    "prepublishOnly": "npm run build && npm test",
+    "dev": "tsx watch src/index.ts",
+    "dev:enhanced": "tsx watch src/index-enhanced.ts"
   },
   "keywords": [
     "mcp",
     "claude",
     "agent",
-    "cli"
+    "cli",
+    "ai",
+    "workflow",
+    "automation"
   ],
-  "author": "",
+  "author": "AgentX Team",
   "license": "ISC",
   "dependencies": {
     "@inquirer/prompts": "^8.4.2",
@@ -38,6 +46,7 @@
     "cli-table3": "^0.6.5",
     "commander": "^14.0.3",
     "js-yaml": "^4.1.1",
+    "lru-cache": "^11.3.5",
     "uuid": "^14.0.0",
     "zod": "^4.3.6"
   },

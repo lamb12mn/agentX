@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx tsc *)",
+      "Bash(node dist/cli.js --help)",
+      "Bash(node dist/cli.js list)",
+      "Bash(node dist/cli.js info)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)"
+    ]
+  }
+}
