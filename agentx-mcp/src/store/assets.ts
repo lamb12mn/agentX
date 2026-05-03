@@ -433,7 +433,7 @@ export async function cloneAsset(
   // 复制依赖关系（使用已导入的函数）
   const deps = getDependenciesFromDeps(sourceId);
   for (const depId of deps) {
-    createDependency(newAsset.id, depId);
+    addDependency(newAsset.id, depId);
   }
 
   return newAsset;

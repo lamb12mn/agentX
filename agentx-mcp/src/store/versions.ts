@@ -217,4 +217,3 @@ export function getVersionStats(assetId: string): { total: number; latest: numbe
   };
 }
 
-import type { AssetMeta } from '../types.js';

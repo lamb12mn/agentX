@@ -120,14 +120,13 @@ export function registerExportTools(baseDir: string) {
         // ZIP/JSON/YAML导出
         try {
           let resultPath: string;
-          const options = { baseDir, format, type };
 
           if (format === 'zip') {
-            resultPath = await exportAsZip(options, output);
+            resultPath = await exportAsZip(baseDir, output);
           } else if (format === 'json') {
-            resultPath = await exportAsJson(options, output);
+            resultPath = await exportAsJson(baseDir, output);
           } else if (format === 'yaml') {
-            resultPath = await exportAsYaml(options, output);
+            resultPath = await exportAsYaml(baseDir, output);
           } else {
             throw createError('INVALID_INPUT', { details: `Unknown format: ${format}` });
           }

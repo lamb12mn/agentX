@@ -41,6 +41,7 @@ export const ErrorCode = {
   IMPORT_FAILED: 'IMPORT_FAILED',
   EXPORT_FAILED: 'EXPORT_FAILED',
   INVALID_FORMAT: 'INVALID_FORMAT',
+  INVALID_CONTENT: 'INVALID_CONTENT',
 
   // Search errors (6xxx)
   SEARCH_FAILED: 'SEARCH_FAILED',
@@ -167,6 +168,10 @@ const errorMessages: Record<ErrorCodeType, { message: string; suggestion: string
   [ErrorCode.INVALID_FORMAT]: {
     message: 'Invalid file format',
     suggestion: 'Use JSON, YAML, or Markdown format',
+  },
+  [ErrorCode.INVALID_CONTENT]: {
+    message: 'Invalid content format',
+    suggestion: 'Check the content format matches the expected schema for this asset type',
   },
 
   // Search errors
