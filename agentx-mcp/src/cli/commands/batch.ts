@@ -11,6 +11,9 @@ import { batchCheckDependencies } from '../../store/dependencies.js';
 
 const VALID_TYPES: AssetType[] = ['skill', 'prompt', 'rule', 'mcp', 'workflow', 'agent'];
 
+/**
+ * Register the `batch` command — batch delete and tag operations
+ */
 export function registerBatchCommand(program: Command): void {
   const deleteCmd = new Command('delete')
     .description('Delete multiple assets by ID')

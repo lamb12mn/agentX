@@ -3,6 +3,13 @@ import Table from 'cli-table3';
 import yaml from 'js-yaml';
 import type { AssetMeta, SearchResult } from '../types.js';
 
+/**
+ * Supported output formatting types for CLI display.
+ * - `table`: Rich table layout with chalk colors
+ * - `json`: Pretty-printed JSON
+ * - `yaml`: YAML document
+ * - `simple`: Tab-separated plain text
+ */
 export type OutputFormat = 'table' | 'json' | 'yaml' | 'simple';
 
 /**
@@ -39,6 +46,11 @@ export function formatSearch(results: SearchResult[], format: OutputFormat = 'ta
   }
 }
 
+/**
+ * Format an array of asset metadata as a styled CLI table.
+ * @param assets - Array of asset metadata objects
+ * @returns Formatted table string with ID, name, tags, and relative update time
+ */
 export function formatTable(assets: AssetMeta[]): string {
   if (assets.length === 0) return chalk.yellow('No assets found.');
 
@@ -57,6 +69,11 @@ export function formatTable(assets: AssetMeta[]): string {
   return table.toString();
 }
 
+/**
+ * Format search results as a human-readable list with scores.
+ * @param results - Array of search result objects containing score and metadata
+ * @returns Formatted string with ranked results including name, type, and description
+ */
 export function formatSearchResults(results: SearchResult[]): string {
   if (results.length === 0) return chalk.yellow('No results found.');
 
@@ -71,6 +88,12 @@ export function formatSearchResults(results: SearchResult[]): string {
   return `Found ${results.length} result${results.length === 1 ? '' : 's'}:\n` + lines.join('\n');
 }
 
+/**
+ * Format a single asset's metadata in the specified output format.
+ * @param asset - The asset metadata object to format
+ * @param format - Output format (table, json, yaml, or simple)
+ * @returns Formatted string representation of the asset metadata
+ */
 export function formatMeta(asset: AssetMeta, format: OutputFormat = 'table'): string {
   switch (format) {
     case 'json':

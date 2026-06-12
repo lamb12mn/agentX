@@ -9,6 +9,9 @@ import yaml from 'js-yaml';
 import chalk from 'chalk';
 import { exportAsZip, exportAsJson, exportAsYaml } from '../../utils/zip.js';
 
+/**
+ * Register the `export` and `export-all` commands — export assets to various formats
+ */
 export function registerExportCommand(program: Command): void {
   program
     .command('export <id>')

@@ -2,6 +2,9 @@ import { Command } from 'commander';
 import chalk from 'chalk';
 import { removeRemote } from '../../../remote/config.js';
 
+/**
+ * Register the `remote remove` command — remove a remote endpoint
+ */
 export function registerRemoteRemove(program: Command) {
     const remote = program.command('remote').description('Remote management commands');
     remote

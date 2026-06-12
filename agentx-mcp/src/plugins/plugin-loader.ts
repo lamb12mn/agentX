@@ -4,6 +4,10 @@ import { createRequire } from 'module';
 import { EventEmitter } from 'events';
 import type { Plugin, PluginManifest, PluginAPI } from '../types/plugin.js';
 
+/**
+ * Plugin loader that discovers, loads, and manages plugins from the filesystem
+ * Extends EventEmitter for plugin lifecycle events
+ */
 export class PluginLoader extends EventEmitter {
   private plugins: Map<string, Plugin> = new Map();
   private pluginDir: string;

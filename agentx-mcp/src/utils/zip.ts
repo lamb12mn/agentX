@@ -168,7 +168,20 @@ export async function exportAllToYaml(
   return filename;
 }
 
-// 导出别名（供其他模块使用）
+/**
+ * Export all assets as a ZIP archive.
+ * Alias for {@link exportAllToZip}.
+ */
 export const exportAsZip = exportAllToZip;
+
+/**
+ * Export all assets as a single JSON file.
+ * Alias for {@link exportAllToJson}.
+ */
 export const exportAsJson = exportAllToJson;
+
+/**
+ * Export all assets as a single YAML file.
+ * Alias for {@link exportAllToYaml}.
+ */
 export const exportAsYaml = exportAllToYaml;

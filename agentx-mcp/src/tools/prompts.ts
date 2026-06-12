@@ -7,6 +7,9 @@ interface ToolHandler<TInput, TOutput> {
   handler: (input: TInput) => Promise<TOutput>;
 }
 
+/**
+ * Prompt-related MCP tool definitions
+ */
 export interface PromptTools {
   list_prompts: ToolHandler<Record<string, never>, AssetMeta[]>;
   get_prompt: ToolHandler<{ id: string }, { meta: AssetMeta; content: string } | null>;
@@ -15,6 +18,11 @@ export interface PromptTools {
   delete_prompt: ToolHandler<{ id: string }, void>;
 }
 
+/**
+ * Register prompt-related MCP tools (CRUD operations for prompts)
+ * @param baseDir - Base directory for asset file storage
+ * @returns Prompt tool handlers map
+ */
 export function registerPromptTools(baseDir: string): PromptTools {
   return {
     list_prompts: {

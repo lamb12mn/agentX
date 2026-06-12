@@ -15,6 +15,10 @@ export interface ValidationResult {
   warnings: ValidationWarning[];
 }
 
+/**
+ * Represents a validation error for a specific input field,
+ * including an error code, human-readable message, and actionable suggestion.
+ */
 export interface ValidationError {
   field: string;
   code: string;
@@ -22,6 +26,10 @@ export interface ValidationError {
   suggestion: string;
 }
 
+/**
+ * Represents a non-blocking validation warning for a specific input field.
+ * Warnings do not prevent the operation but suggest potential issues.
+ */
 export interface ValidationWarning {
   field: string;
   message: string;

@@ -6,9 +6,14 @@ import yaml from 'js-yaml';
 import { createError, ErrorCode } from '../utils/errors.js';
 
 /**
- * 导出工具MCP工具
+ * Export MCP tools - provides agent export and bulk export functionality
  */
 
+/**
+ * Register export MCP tools (export agent, export all assets in various formats)
+ * @param baseDir - Base directory for asset file storage
+ * @returns Export tool handlers map
+ */
 export function registerExportTools(baseDir: string) {
   return {
     export_agent: {

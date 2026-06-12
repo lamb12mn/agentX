@@ -1,17 +1,28 @@
 import { batchDeleteAssets, batchAddTags, batchRemoveTags } from '../store/assets.js';
 import type { ToolHandler } from './common.js';
 
+/**
+ * Input parameters for batch delete operation
+ */
 interface BatchDeleteInput {
   ids: string[];
   force?: boolean;
   dryRun?: boolean;
 }
 
+/**
+ * Input parameters for batch tag operation
+ */
 interface BatchTagInput {
   ids: string[];
   tags: string[];
 }
 
+/**
+ * Register batch operation MCP tools (batch delete, batch tag add/remove)
+ * @param baseDir - Base directory for asset file storage
+ * @returns Batch tool handlers map
+ */
 export function registerBatchTools(baseDir: string): {
   batch_delete: ToolHandler<BatchDeleteInput, {
     deleted: string[];

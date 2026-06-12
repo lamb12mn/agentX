@@ -6,6 +6,9 @@ import { getRemote } from '../../../remote/config.js';
 import { fetchAssets, fetchAsset } from '../../../remote/client.js';
 import { createAsset, updateAsset } from '../../../store/assets.js';
 
+/**
+ * Register the `pull` command — pull assets from a remote endpoint
+ */
 export function registerPull(program: Command) {
     program
         .command('pull <remote> [assetId]')

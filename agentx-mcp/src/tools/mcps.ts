@@ -8,6 +8,9 @@ interface ToolHandler<TInput, TOutput> {
   handler: (input: TInput) => Promise<TOutput>;
 }
 
+/**
+ * MCP server-related MCP tool definitions
+ */
 export interface McpTools {
   list_mcps: ToolHandler<Record<string, never>, AssetMeta[]>;
   get_mcp: ToolHandler<{ id: string }, { meta: AssetMeta; config: McpConfig } | null>;
@@ -16,6 +19,11 @@ export interface McpTools {
   delete_mcp: ToolHandler<{ id: string }, void>;
 }
 
+/**
+ * Register MCP server-related MCP tools (CRUD operations for MCP configs)
+ * @param baseDir - Base directory for asset file storage
+ * @returns MCP tool handlers map
+ */
 export function registerMcpTools(baseDir: string): McpTools {
   return {
     list_mcps: {

@@ -4,6 +4,9 @@ import fs from 'fs';
 import path from 'path';
 import { getAsset, listAssets, getDependents } from '../../store/assets.js';
 
+/**
+ * Register the `graph` command — generate dependency graph in DOT format
+ */
 export function registerGraphCommand(program: Command) {
     program
         .command('graph <assetId>')

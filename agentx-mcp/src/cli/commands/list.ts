@@ -9,6 +9,9 @@ import chalk from 'chalk';
 
 const VALID_TYPES: AssetType[] = ['skill', 'prompt', 'rule', 'mcp', 'workflow', 'agent'];
 
+/**
+ * Register the `list` command — list assets by type with formatted output
+ */
 export function registerListCommand(program: Command): void {
   program
     .command('list [type]')

@@ -5,6 +5,9 @@ import { initDb } from '../../store/db.js';
 import { searchAssets } from '../../store/search.js';
 import { formatSearch } from '../format.js';
 
+/**
+ * Register the `search` command — full-text search across all assets
+ */
 export function registerSearchCommand(program: Command): void {
   program
     .command('search <query>')

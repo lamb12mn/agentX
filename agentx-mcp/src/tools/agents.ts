@@ -3,12 +3,23 @@ import { createAsset, getAsset, listAssets, updateAsset, deleteAsset, readAssetC
 import { exportAgent } from '../export/claude.js';
 import type { AssetMeta, AgentConfig } from '../types.js';
 
+/**
+ * Handler interface for MCP tool registration
+ * @template TInput - The input parameter type
+ * @template TOutput - The return type
+ */
 interface ToolHandler<TInput, TOutput> {
   description: string;
   inputSchema: Record<string, unknown>;
   handler: (input: TInput) => Promise<TOutput>;
 }
 
+/**
+ * Agent-related MCP tool definitions
+ */
+/**
+ * Agent-related MCP tool definitions
+ */
 export interface AgentTools {
   list_agents: ToolHandler<Record<string, never>, AssetMeta[]>;
   get_agent: ToolHandler<{ id: string }, { meta: AssetMeta; config: AgentConfig } | null>;
@@ -18,6 +29,11 @@ export interface AgentTools {
   export_agent: ToolHandler<{ id: string; output_dir: string }, { claude_md_path: string; settings_json_path: string }>;
 }
 
+/**
+ * Register agent-related MCP tools (CRUD operations + export)
+ * @param baseDir - Base directory for asset file storage
+ * @returns Agent tool handlers map
+ */
 export function registerAgentTools(baseDir: string): AgentTools {
   return {
     list_agents: {

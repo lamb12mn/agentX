@@ -7,6 +7,9 @@ interface ToolHandler<TInput, TOutput> {
   handler: (input: TInput) => Promise<TOutput>;
 }
 
+/**
+ * Workflow-related MCP tool definitions
+ */
 export interface WorkflowTools {
   list_workflows: ToolHandler<Record<string, never>, AssetMeta[]>;
   get_workflow: ToolHandler<{ id: string }, { meta: AssetMeta; content: string } | null>;
@@ -15,6 +18,11 @@ export interface WorkflowTools {
   delete_workflow: ToolHandler<{ id: string }, void>;
 }
 
+/**
+ * Register workflow-related MCP tools (CRUD operations for workflows)
+ * @param baseDir - Base directory for asset file storage
+ * @returns Workflow tool handlers map
+ */
 export function registerWorkflowTools(baseDir: string): WorkflowTools {
   return {
     list_workflows: {

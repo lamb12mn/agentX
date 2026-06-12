@@ -42,6 +42,11 @@ export function logAudit(entry: AuditEntry): void {
     fs.appendFileSync(AUDIT_LOG_PATH, logLine, 'utf8');
 }
 
+/**
+ * Query audit log entries with optional filters.
+ * @param options - Filter options including action, assetId, date range, and limit
+ * @returns Array of matching audit entries, sorted by time ascending
+ */
 export function queryAudit(options: {
     action?: AuditAction;
     assetId?: string;

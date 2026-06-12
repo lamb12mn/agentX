@@ -2,6 +2,9 @@ import { EventEmitter } from 'events';
 import { getDb } from '../store/db.js';
 import type { AssetMeta } from '../types.js';
 
+/**
+ * Configuration for cloud sync service
+ */
 export interface SyncConfig {
   endpoint: string;
   apiKey: string;
@@ -9,6 +12,9 @@ export interface SyncConfig {
   autoSync: boolean;
 }
 
+/**
+ * Result of a sync operation
+ */
 export interface SyncResult {
   success: boolean;
   uploaded: number;
@@ -17,6 +23,9 @@ export interface SyncResult {
   errors: string[];
 }
 
+/**
+ * Current status of the sync service
+ */
 export interface SyncStatus {
   lastSync: number | null;
   isSyncing: boolean;
@@ -25,6 +34,10 @@ export interface SyncStatus {
   totalAssets: number;
 }
 
+/**
+ * Cloud sync service for synchronizing assets with a remote endpoint
+ * Extends EventEmitter for sync lifecycle events
+ */
 export class CloudSyncService extends EventEmitter {
   private config: SyncConfig | null = null;
   private status: SyncStatus = {

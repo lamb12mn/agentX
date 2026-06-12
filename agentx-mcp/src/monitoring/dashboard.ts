@@ -1,12 +1,18 @@
 import { EventEmitter } from 'events';
 import type { AssetMeta } from '../types.js';
 
+/**
+ * Configuration for the monitoring dashboard
+ */
 export interface DashboardConfig {
   refreshInterval: number;
   enableCharts: boolean;
   enableRealTime: boolean;
 }
 
+/**
+ * Metrics data for the monitoring dashboard
+ */
 export interface DashboardMetrics {
   assets: {
     total: number;
@@ -31,11 +37,17 @@ export interface DashboardMetrics {
   };
 }
 
+/**
+ * Chart data structure for dashboard visualizations
+ */
 export interface ChartData {
   labels: string[];
   datasets: ChartDataset[];
 }
 
+/**
+ * Dataset within a chart
+ */
 export interface ChartDataset {
   label: string;
   data: number[];
@@ -43,12 +55,19 @@ export interface ChartDataset {
   type?: 'line' | 'bar' | 'pie';
 }
 
+/**
+ * Real-time event for dashboard live updates
+ */
 export interface RealTimeEvent {
   type: string;
   data: any;
   timestamp: number;
 }
 
+/**
+ * Monitoring dashboard for real-time system metrics and visualization
+ * Extends EventEmitter for event-driven metric updates
+ */
 export class MonitoringDashboard extends EventEmitter {
   private config: DashboardConfig;
   private metrics: DashboardMetrics;

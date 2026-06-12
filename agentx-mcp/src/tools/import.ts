@@ -6,12 +6,20 @@ import type { AssetMeta, AssetType, ImportResult } from '../types.js';
 
 export type { ImportResult };
 
+/**
+ * Handler interface for MCP tool registration
+ * @template TInput - The input parameter type
+ * @template TOutput - The return type
+ */
 interface ToolHandler<TInput, TOutput> {
   description: string;
   inputSchema: Record<string, unknown>;
   handler: (input: TInput) => Promise<TOutput>;
 }
 
+/**
+ * Import-related MCP tool definitions
+ */
 export interface ImportTools {
   import_from_claude: ToolHandler<
     { type: AssetType; source_dir?: string; tags?: string[] },
@@ -19,6 +27,11 @@ export interface ImportTools {
   >;
 }
 
+/**
+ * Register import-related MCP tools (import from Claude Code directories)
+ * @param baseDir - Base directory for asset file storage
+ * @returns Import tool handlers map
+ */
 export function registerImportTools(baseDir: string): ImportTools {
   return {
     import_from_claude: {

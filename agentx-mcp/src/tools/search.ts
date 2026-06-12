@@ -8,6 +8,9 @@ interface ToolHandler<TInput, TOutput> {
   handler: (input: TInput) => Promise<TOutput>;
 }
 
+/**
+ * Search-related MCP tool definitions
+ */
 export interface SearchTools {
   search_assets: ToolHandler<
     { query: string; type?: AssetType; limit?: number },
@@ -15,6 +18,10 @@ export interface SearchTools {
   >;
 }
 
+/**
+ * Register search-related MCP tools (full-text search)
+ * @returns Search tool handlers map
+ */
 export function registerSearchTools(): SearchTools {
   return {
     search_assets: {

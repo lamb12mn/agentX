@@ -2,6 +2,9 @@ import { Command } from 'commander';
 import chalk from 'chalk';
 import { queryAudit, AuditAction } from '../../audit/index.js';
 
+/**
+ * Register the `audit` command — query audit logs with filters
+ */
 export function registerAuditCommand(program: Command) {
     program
         .command('audit')

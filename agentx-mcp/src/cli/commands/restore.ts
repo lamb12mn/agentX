@@ -5,6 +5,9 @@ import path from 'path';
 import { execSync } from 'child_process';
 import os from 'os';
 
+/**
+ * Register the `restore` command — restore AgentX data from a backup file
+ */
 export function registerRestoreCommand(program: Command) {
     program
         .command('restore <backup-file>')

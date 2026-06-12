@@ -6,7 +6,7 @@
 import type { AssetType, AgentConfig, McpConfig } from '../types.js';
 
 /**
- * Template definition
+ * Template definition for creating new assets
  */
 export interface Template {
   id: string;
@@ -18,7 +18,7 @@ export interface Template {
 }
 
 /**
- * Skill templates
+ * Predefined skill templates
  */
 export const skillTemplates: Template[] = [
   {
@@ -86,7 +86,7 @@ Help with writing and editing content.
 ];
 
 /**
- * Agent templates
+ * Predefined agent templates
  */
 export const agentTemplates: Template[] = [
   {
@@ -136,7 +136,7 @@ skills:
 ];
 
 /**
- * MCP server templates
+ * Predefined MCP server templates
  */
 export const mcpTemplates: Template[] = [
   {
@@ -173,7 +173,7 @@ enabled: false
 ];
 
 /**
- * Prompt templates
+ * Predefined prompt templates
  */
 export const promptTemplates: Template[] = [
   {
@@ -212,7 +212,7 @@ Constraints:
 ];
 
 /**
- * Rule templates
+ * Predefined rule templates
  */
 export const ruleTemplates: Template[] = [
   {
@@ -242,7 +242,7 @@ export const ruleTemplates: Template[] = [
 ];
 
 /**
- * Workflow templates
+ * Predefined workflow templates
  */
 export const workflowTemplates: Template[] = [
   {
@@ -266,7 +266,9 @@ on_failure: stop
 ];
 
 /**
- * Get all templates for a type
+ * Get all templates for a given asset type
+ * @param type - The asset type to filter by
+ * @returns Array of templates matching the specified type
  */
 export function getTemplatesByType(type: AssetType): Template[] {
   switch (type) {
@@ -281,7 +283,9 @@ export function getTemplatesByType(type: AssetType): Template[] {
 }
 
 /**
- * Get template by ID
+ * Get a template by its unique ID
+ * @param id - The template ID to look up
+ * @returns The matching template, or undefined if not found
  */
 export function getTemplate(id: string): Template | undefined {
   const all = [...skillTemplates, ...agentTemplates, ...mcpTemplates, ...promptTemplates, ...ruleTemplates, ...workflowTemplates];
@@ -289,7 +293,8 @@ export function getTemplate(id: string): Template | undefined {
 }
 
 /**
- * List all available templates
+ * List all available templates across all asset types
+ * @returns Array of all predefined templates
  */
 export function listTemplates(): Template[] {
   return [

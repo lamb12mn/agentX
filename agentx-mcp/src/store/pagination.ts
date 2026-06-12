@@ -3,7 +3,9 @@ import { getDb } from './db.js';
 import type { PaginationOptions, PaginatedResult } from '../types/pagination.js';
 
 /**
- * 分页查询资产
+ * Query assets with pagination, filtering, sorting, and full-text search
+ * @param options - Pagination and filter options
+ * @returns Paginated result with metadata
  */
 export async function getAssetsPaginated(
   options: PaginationOptions = {}
@@ -104,7 +106,10 @@ export async function getAssetsPaginated(
 }
 
 /**
- * 批量获取资产（用于导出等场景）
+ * Batch fetch assets by IDs in chunks (for export, etc.)
+ * @param ids - Array of asset IDs
+ * @param batchSize - Chunk size per query
+ * @returns Array of matching asset metadata
  */
 export async function getAssetsBatch(
   ids: string[],
@@ -125,7 +130,10 @@ export async function getAssetsBatch(
 }
 
 /**
- * 流式查询大量数据
+ * Stream assets in batches for memory-efficient processing
+ * @param type - Optional asset type filter
+ * @param batchSize - Number of assets per batch
+ * @yields Arrays of asset metadata in batches
  */
 export async function* streamAssets(
   type?: AssetType,
@@ -158,7 +166,8 @@ export async function* streamAssets(
 }
 
 /**
- * 获取统计信息
+ * Get system statistics: total assets, counts by type, recent activity
+ * @returns Statistics object
  */
 export async function getStats(): Promise<{
   totalAssets: number;

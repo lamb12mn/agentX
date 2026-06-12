@@ -1,6 +1,9 @@
 import { EventEmitter } from 'events';
 import type { AssetMeta, AssetType } from '../types.js';
 
+/**
+ * AI recommendation for asset management
+ */
 export interface AIRecommendation {
   type: 'asset' | 'workflow' | 'optimization';
   title: string;
@@ -10,6 +13,9 @@ export interface AIRecommendation {
   actions: RecommendedAction[];
 }
 
+/**
+ * Recommended action that can be executed
+ */
 export interface RecommendedAction {
   type: 'create' | 'update' | 'delete' | 'link';
   target: string;
@@ -17,6 +23,9 @@ export interface RecommendedAction {
   execute: () => Promise<void>;
 }
 
+/**
+ * Configuration for the AI assistant
+ */
 export interface AssistantConfig {
   enabled: boolean;
   autoSuggest: boolean;
@@ -24,6 +33,9 @@ export interface AssistantConfig {
   maxSuggestions: number;
 }
 
+/**
+ * Context data used by the AI assistant for generating suggestions
+ */
 export interface AssistantContext {
   recentActivity: AssetMeta[];
   assetTypes: Record<AssetType, number>;
@@ -31,12 +43,19 @@ export interface AssistantContext {
   userPreferences: UserPreferences;
 }
 
+/**
+ * User preferences for AI suggestions
+ */
 export interface UserPreferences {
   preferredAssetTypes: AssetType[];
   complexityLevel: 'beginner' | 'intermediate' | 'advanced';
   notificationFrequency: 'low' | 'medium' | 'high';
 }
 
+/**
+ * AI Assistant that provides intelligent suggestions for asset management
+ * Extends EventEmitter for event-driven suggestion notifications
+ */
 export class AIAssistant extends EventEmitter {
   private config: AssistantConfig;
   private context: AssistantContext | null = null;

@@ -3,12 +3,20 @@ import type { AssetMeta } from '../types.js';
 import { validateCreateAssetInput, validateUpdateAssetInput, validateDeleteAssetInput, formatValidationResult } from '../utils/validation.js';
 import { formatError } from '../utils/errors.js';
 
+/**
+ * Handler interface for MCP tool registration
+ * @template TInput - The input parameter type
+ * @template TOutput - The return type
+ */
 interface ToolHandler<TInput, TOutput> {
   description: string;
   inputSchema: Record<string, unknown>;
   handler: (input: TInput) => Promise<TOutput>;
 }
 
+/**
+ * Skill-related MCP tool definitions
+ */
 interface SkillTools {
   list_skills: ToolHandler<Record<string, never>, AssetMeta[]>;
   get_skill: ToolHandler<{ id: string }, AssetMeta | null>;
@@ -23,6 +31,11 @@ interface SkillTools {
   delete_skill: ToolHandler<{ id: string }, void>;
 }
 
+/**
+ * Register skill-related MCP tools (CRUD operations for skills)
+ * @param baseDir - Base directory for asset file storage
+ * @returns Skill tool handlers map
+ */
 export function registerSkillTools(baseDir: string): SkillTools {
   return {
     list_skills: {

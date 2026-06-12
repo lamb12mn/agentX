@@ -8,6 +8,9 @@ import chalk from 'chalk';
 
 const VALID_TYPES: AssetType[] = ['skill', 'prompt', 'rule'];
 
+/**
+ * Register the `import` command — import assets from Claude Code directories
+ */
 export function registerImportCommand(program: Command): void {
   program
     .command('import <type>')

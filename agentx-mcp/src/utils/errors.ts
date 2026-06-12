@@ -48,6 +48,10 @@ export const ErrorCode = {
   INVALID_QUERY: 'INVALID_QUERY',
 } as const;
 
+/**
+ * Union type of all possible error codes defined in the ErrorCode constant.
+ * Used for type-safe error handling throughout the application.
+ */
 export type ErrorCodeType = typeof ErrorCode[keyof typeof ErrorCode];
 
 /**

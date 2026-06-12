@@ -9,6 +9,9 @@ import type { AssetType } from '../../types.js';
 
 const TYPES: AssetType[] = ['skill', 'prompt', 'rule', 'mcp', 'workflow', 'agent'];
 
+/**
+ * Register the `info` command — show asset library statistics
+ */
 export function registerInfoCommand(program: Command): void {
   program
     .command('info')

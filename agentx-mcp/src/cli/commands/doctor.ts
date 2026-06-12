@@ -5,6 +5,9 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 
+/**
+ * Register the `doctor` command — diagnose environment, dependencies, and configuration
+ */
 export function registerDoctorCommand(program: Command) {
     program
         .command('doctor')

@@ -19,6 +19,9 @@ interface CreateOptions {
   interactive?: boolean;
 }
 
+/**
+ * Register the `create` command — create a new asset with interactive or CLI options
+ */
 export function registerCreateCommand(program: Command): void {
   program
     .command('create')

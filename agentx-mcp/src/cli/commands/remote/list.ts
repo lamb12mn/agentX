@@ -2,6 +2,9 @@ import { Command } from 'commander';
 import chalk from 'chalk';
 import { loadRemotes } from '../../../remote/config.js';
 
+/**
+ * Register the `remote list` command — list all configured remotes
+ */
 export function registerRemoteList(program: Command) {
     const remote = program.command('remote').description('Remote management commands');
     remote

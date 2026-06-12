@@ -2,6 +2,9 @@ import { Command } from 'commander';
 import chalk from 'chalk';
 import { addRemote } from '../../../remote/config.js';
 
+/**
+ * Register the `remote add` command — add a remote AgentX endpoint
+ */
 export function registerRemoteAdd(program: Command) {
     const remote = program.command('remote').description('Remote management commands');
     remote

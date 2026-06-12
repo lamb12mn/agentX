@@ -5,6 +5,9 @@ import path from 'path';
 import { execSync } from 'child_process';
 import os from 'os';
 
+/**
+ * Register the `backup` command — backup all AgentX data to a tar.gz archive
+ */
 export function registerBackupCommand(program: Command) {
     program
         .command('backup')

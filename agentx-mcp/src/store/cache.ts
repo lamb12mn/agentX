@@ -30,7 +30,9 @@ const paginatedCache = new LRUCache<string, {
   updateAgeOnGet: true,
 });
 
-// 性能监控
+/**
+ * Cache performance monitoring statistics
+ */
 interface CacheStats {
   hits: number;
   misses: number;
@@ -45,6 +47,11 @@ const stats: CacheStats = {
   size: 0,
 };
 
+/**
+ * Retrieve an asset metadata from the LRU cache
+ * @param id - Asset ID
+ * @returns Cached asset metadata, or undefined if not found
+ */
 export function getAssetFromCache(id: string): AssetMeta | undefined {
   const cached = assetCache.get(id);
   if (cached) {
@@ -55,17 +62,29 @@ export function getAssetFromCache(id: string): AssetMeta | undefined {
   return undefined;
 }
 
+/**
+ * Store an asset metadata in the LRU cache
+ * @param id - Asset ID
+ * @param asset - Asset metadata to cache
+ */
 export function setAssetInCache(id: string, asset: AssetMeta): void {
   assetCache.set(id, asset);
   stats.size = assetCache.size;
 }
 
+/**
+ * Remove an asset from all caches (metadata and content)
+ * @param id - Asset ID to remove
+ */
 export function deleteAssetFromCache(id: string): void {
   assetCache.delete(id);
   contentCache.delete(id);
   stats.size = assetCache.size;
 }
 
+/**
+ * Clear all asset caches (metadata, content, list, paginated) and reset stats
+ */
 export function clearAssetCache(): void {
   assetCache.clear();
   contentCache.clear();
@@ -76,6 +95,11 @@ export function clearAssetCache(): void {
   stats.misses = 0;
 }
 
+/**
+ * Retrieve asset content from the LRU cache
+ * @param id - Asset ID
+ * @returns Cached content string, or undefined if not found
+ */
 export function getContentFromCache(id: string): string | undefined {
   const cached = contentCache.get(id);
   if (cached) {
@@ -86,10 +110,20 @@ export function getContentFromCache(id: string): string | undefined {
   return undefined;
 }
 
+/**
+ * Store asset content in the LRU cache
+ * @param id - Asset ID
+ * @param content - Content string to cache
+ */
 export function setContentInCache(id: string, content: string): void {
   contentCache.set(id, content);
 }
 
+/**
+ * Retrieve a cached asset list for a given type
+ * @param type - Optional asset type filter
+ * @returns Cached asset list, or undefined if not found
+ */
 export function getListFromCache(type?: string): AssetMeta[] | undefined {
   const key = type || 'all';
   const cached = listCache.get(key);
@@ -101,11 +135,21 @@ export function getListFromCache(type?: string): AssetMeta[] | undefined {
   return undefined;
 }
 
+/**
+ * Store an asset list in the LRU cache
+ * @param type - Optional asset type filter key
+ * @param assets - Asset list to cache
+ */
 export function setListInCache(type: string | undefined, assets: AssetMeta[]): void {
   const key = type || 'all';
   listCache.set(key, assets);
 }
 
+/**
+ * Retrieve a cached paginated result set
+ * @param key - Cache key for the paginated query
+ * @returns Cached paginated result, or undefined if not found
+ */
 export function getPaginatedFromCache(key: string): {
   data: AssetMeta[];
   total: number;
@@ -121,6 +165,14 @@ export function getPaginatedFromCache(key: string): {
   return undefined;
 }
 
+/**
+ * Store a paginated result set in the LRU cache
+ * @param key - Cache key for the paginated query
+ * @param data - Asset data for the current page
+ * @param total - Total number of assets matching the query
+ * @param page - Current page number
+ * @param pageSize - Number of items per page
+ */
 export function setPaginatedInCache(
   key: string,
   data: AssetMeta[],
@@ -131,11 +183,18 @@ export function setPaginatedInCache(
   paginatedCache.set(key, { data, total, page, pageSize });
 }
 
+/**
+ * Invalidate all list and paginated caches (call after mutations)
+ */
 export function invalidateListCache(): void {
   listCache.clear();
   paginatedCache.clear();
 }
 
+/**
+ * Get cache statistics including hit rate and sizes for all cache instances
+ * @returns Combined cache statistics
+ */
 export function getCacheStats(): CacheStats & {
   assetCacheSize: number;
   contentCacheSize: number;
@@ -154,6 +213,10 @@ export function getCacheStats(): CacheStats & {
   };
 }
 
+/**
+ * Update cache configuration (max entries and TTL) at runtime
+ * @param options - Cache configuration overrides
+ */
 export function updateCacheConfig(options: {
   max?: number;
   ttl?: number;

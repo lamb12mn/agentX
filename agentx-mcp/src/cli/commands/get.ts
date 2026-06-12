@@ -6,6 +6,9 @@ import { getAsset, readAssetContent } from '../../store/assets.js';
 import { formatMeta } from '../format.js';
 import chalk from 'chalk';
 
+/**
+ * Register the `get` command — show asset details and optional content
+ */
 export function registerGetCommand(program: Command): void {
   program
     .command('get <id>')

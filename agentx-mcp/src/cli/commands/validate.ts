@@ -81,6 +81,9 @@ async function validateAll(): Promise<ValidationEntry[]> {
   return results;
 }
 
+/**
+ * Register the `validate` command — validate asset integrity
+ */
 export function registerValidateCommand(program: Command): void {
   program
     .command('validate [id]')

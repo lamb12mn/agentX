@@ -2,6 +2,9 @@ import { Command } from 'commander';
 import chalk from 'chalk';
 import { cloneAsset, getAsset } from '../../store/assets.js';
 
+/**
+ * Register the `clone` command — clone an asset to create a copy
+ */
 export function registerCloneCommand(program: Command): void {
   program
     .command('clone')

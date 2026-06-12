@@ -3,6 +3,9 @@ import chalk from 'chalk';
 import net from 'net';
 import fs from 'fs';
 
+/**
+ * Register the `proxy` command — start MCP proxy for JSON-RPC logging
+ */
 export function registerProxyCommand(program: Command) {
     program
         .command('proxy')

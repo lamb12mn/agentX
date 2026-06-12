@@ -4,6 +4,9 @@ import { execSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 
+/**
+ * Register the `init` command — initialize a new project from a template
+ */
 export function registerInitCommand(program: Command) {
     program
         .command('init [template]')

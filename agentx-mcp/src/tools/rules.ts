@@ -7,6 +7,9 @@ interface ToolHandler<TInput, TOutput> {
   handler: (input: TInput) => Promise<TOutput>;
 }
 
+/**
+ * Rule-related MCP tool definitions
+ */
 export interface RuleTools {
   list_rules: ToolHandler<Record<string, never>, AssetMeta[]>;
   get_rule: ToolHandler<{ id: string }, { meta: AssetMeta; content: string } | null>;
@@ -15,6 +18,11 @@ export interface RuleTools {
   delete_rule: ToolHandler<{ id: string }, void>;
 }
 
+/**
+ * Register rule-related MCP tools (CRUD operations for rules)
+ * @param baseDir - Base directory for asset file storage
+ * @returns Rule tool handlers map
+ */
 export function registerRuleTools(baseDir: string): RuleTools {
   return {
     list_rules: {

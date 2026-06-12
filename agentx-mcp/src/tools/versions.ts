@@ -10,6 +10,10 @@ import {
 import { getAsset } from '../store/assets.js';
 import type { ToolHandler } from './common.js';
 
+/**
+ * Register version management MCP tools (snapshot, list, get, rollback, clear, stats)
+ * @returns Version tool handlers map
+ */
 export function registerVersionTools(): {
   create_version_snapshot: ToolHandler<{ assetId: string; createdBy?: string }, { version: number; message: string }>;
   list_versions: ToolHandler<{ assetId: string }, Array<{

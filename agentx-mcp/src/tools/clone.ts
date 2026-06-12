@@ -1,6 +1,11 @@
 import { cloneAsset } from '../store/assets.js';
 import type { ToolHandler } from './common.js';
 
+/**
+ * Register clone MCP tool (duplicate an existing asset)
+ * @param baseDir - Base directory for asset file storage
+ * @returns Clone tool handlers map
+ */
 export function registerCloneTools(baseDir: string): {
   clone_asset: ToolHandler<{ assetId: string; newName?: string }, {
     success: boolean;

@@ -26,6 +26,9 @@ import {
 import { getAssetsPaginated, getStats, streamAssets } from './pagination.js';
 import chalk from 'chalk';
 
+/**
+ * Input parameters for creating a new asset
+ */
 interface CreateAssetInput {
   type: AssetType;
   name: string;
@@ -33,6 +36,9 @@ interface CreateAssetInput {
   description?: string;
 }
 
+/**
+ * Input parameters for updating an existing asset
+ */
 interface UpdateAssetInput {
   name?: string;
   description?: string;
@@ -59,7 +65,11 @@ function rowToMeta(row: Record<string, unknown>): AssetMeta {
 }
 
 /**
- * 创建资产（增强版，带缓存）
+ * Create a new asset with file persistence, DB indexing, and cache population
+ * @param input - Asset creation parameters (type, name, tags, description)
+ * @param content - Asset content string
+ * @param baseDir - Base directory for asset file storage
+ * @returns The created asset metadata
  */
 export async function createAssetEnhanced(
   input: CreateAssetInput,
@@ -105,7 +115,9 @@ export async function createAssetEnhanced(
 }
 
 /**
- * 获取资产（带缓存）
+ * Get an asset by ID with LRU cache support
+ * @param id - Asset ID
+ * @returns Asset metadata, or null if not found
  */
 export async function getAssetEnhanced(id: string): Promise<AssetMeta | null> {
   // 先从缓存获取
@@ -130,7 +142,9 @@ export async function getAssetEnhanced(id: string): Promise<AssetMeta | null> {
 }
 
 /**
- * 列出资产（带缓存）
+ * List assets with LRU cache support, optionally filtered by type
+ * @param type - Optional asset type filter
+ * @returns Array of matching asset metadata
  */
 export async function listAssetsEnhanced(type?: AssetType): Promise<AssetMeta[]> {
   // 先从缓存获取
@@ -153,7 +167,10 @@ export async function listAssetsEnhanced(type?: AssetType): Promise<AssetMeta[]>
 }
 
 /**
- * 更新资产（带缓存失效）
+ * Update an asset's metadata and/or content with cache invalidation
+ * @param id - Asset ID
+ * @param input - Partial update fields (name, description, tags, content)
+ * @returns Updated asset metadata
  */
 export async function updateAssetEnhanced(id: string, input: UpdateAssetInput): Promise<AssetMeta> {
   const db = getDb();
@@ -195,7 +212,8 @@ export async function updateAssetEnhanced(id: string, input: UpdateAssetInput): 
 }
 
 /**
- * 删除资产（带缓存失效）
+ * Delete an asset by ID, removing file, DB record, and cache entries
+ * @param id - Asset ID to delete
  */
 export async function deleteAssetEnhanced(id: string): Promise<void> {
   const db = getDb();
@@ -221,7 +239,10 @@ export async function deleteAssetEnhanced(id: string): Promise<void> {
 }
 
 /**
- * 读取资产内容（带缓存）
+ * Read asset content from file with LRU cache support
+ * @param id - Asset ID
+ * @returns Asset content string
+ * @throws Error if asset not found
  */
 export async function readAssetContentEnhanced(id: string): Promise<string> {
   // 先从缓存获取
@@ -245,7 +266,10 @@ export async function readAssetContentEnhanced(id: string): Promise<string> {
 }
 
 /**
- * 批量删除资产（增强版）
+ * Batch delete multiple assets with dependency checking and cache invalidation
+ * @param ids - Array of asset IDs to delete
+ * @param options - Delete options (force, dryRun)
+ * @returns Result with deleted, blocked, and error lists
  */
 export async function batchDeleteAssetsEnhanced(
   ids: string[],
@@ -356,7 +380,10 @@ export async function batchDeleteAssetsEnhanced(
 }
 
 /**
- * 批量添加标签（增强版）
+ * Batch add tags to multiple assets with cache invalidation
+ * @param ids - Array of asset IDs
+ * @param tags - Tags to add
+ * @returns Result with updated and error lists
  */
 export async function batchAddTagsEnhanced(
   ids: string[],
@@ -405,7 +432,10 @@ export async function batchAddTagsEnhanced(
 }
 
 /**
- * 批量移除标签（增强版）
+ * Batch remove tags from multiple assets with cache invalidation
+ * @param ids - Array of asset IDs
+ * @param tags - Tags to remove
+ * @returns Result with updated and error lists
  */
 export async function batchRemoveTagsEnhanced(
   ids: string[],
@@ -454,21 +484,26 @@ export async function batchRemoveTagsEnhanced(
 }
 
 /**
- * 获取缓存统计信息
+ * Get cache statistics (hit rate, sizes) from the cache module
+ * @returns Cache statistics object
  */
 export function getCacheStatistics() {
   return getCacheStats();
 }
 
 /**
- * 获取系统统计信息
+ * Get system statistics (total assets, by type, recent activity)
+ * @returns System statistics object
  */
 export async function getSystemStats() {
   return await getStats();
 }
 
 /**
- * 流式处理资产
+ * Stream assets in batches for memory-efficient processing
+ * @param type - Optional asset type filter
+ * @param batchSize - Number of assets per batch
+ * @yields Arrays of asset metadata in batches
  */
 export async function* streamAssetsEnhanced(type?: AssetType, batchSize: number = 100) {
   yield* streamAssets(type, batchSize);

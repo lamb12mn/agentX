@@ -5,6 +5,10 @@ import { dirname } from 'path';
 import { mkdir } from 'fs/promises';
 import type { AssetMeta } from '../types.js';
 
+/**
+ * Represents a version snapshot of an asset, storing both metadata and content
+ * at a specific point in time for rollback and audit purposes.
+ */
 export interface VersionSnapshot {
   id: number;
   asset_id: string;

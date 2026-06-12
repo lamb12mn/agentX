@@ -10,6 +10,9 @@ import { checkDeleteSafety } from '../../store/dependencies.js';
 
 const VALID_TYPES: AssetType[] = ['skill', 'prompt', 'rule', 'mcp', 'workflow', 'agent'];
 
+/**
+ * Register the `delete` command — delete asset(s) by ID or by type
+ */
 export function registerDeleteCommand(program: Command): void {
   program
     .command('delete [id...]')

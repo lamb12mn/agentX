@@ -1,3 +1,6 @@
+/**
+ * Configuration for responsive UI breakpoints and features
+ */
 export interface ResponsiveConfig {
   breakpoints: {
     mobile: number;
@@ -8,6 +11,9 @@ export interface ResponsiveConfig {
   adaptiveLayout: boolean;
 }
 
+/**
+ * UI component with responsive behavior
+ */
 export interface UIComponent {
   id: string;
   type: string;
@@ -15,12 +21,18 @@ export interface UIComponent {
   responsive: ResponsiveBehavior;
 }
 
+/**
+ * Responsive behavior definitions for different breakpoints
+ */
 export interface ResponsiveBehavior {
   mobile: ComponentStyle;
   tablet: ComponentStyle;
   desktop: ComponentStyle;
 }
 
+/**
+ * CSS-like component style properties
+ */
 export interface ComponentStyle {
   display: string;
   width: string;
@@ -30,6 +42,10 @@ export interface ComponentStyle {
   margin: string;
 }
 
+/**
+ * Mobile-responsive UI manager that handles component styling across breakpoints
+ * Supports touch detection, responsive CSS generation, and breakpoint management
+ */
 export class MobileResponsiveUI {
   private listeners: Map<string, Array<(...args: any[]) => void>> = new Map();
 

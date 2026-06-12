@@ -1,5 +1,8 @@
 import type { Workflow, WorkflowStep, WorkflowConnection } from '../types/workflow.js';
 
+/**
+ * Configuration for the visual workflow editor canvas
+ */
 export interface VisualEditorConfig {
   canvasWidth: number;
   canvasHeight: number;
@@ -8,11 +11,17 @@ export interface VisualEditorConfig {
   showGrid: boolean;
 }
 
+/**
+ * 2D position coordinates
+ */
 export interface NodePosition {
   x: number;
   y: number;
 }
 
+/**
+ * Visual node in the workflow editor canvas
+ */
 export interface VisualNode {
   id: string;
   type: 'step' | 'condition' | 'start' | 'end';
@@ -23,6 +32,9 @@ export interface VisualNode {
   height: number;
 }
 
+/**
+ * Visual connection (edge) between two nodes in the workflow editor
+ */
 export interface VisualConnection {
   id: string;
   from: string;
@@ -32,6 +44,10 @@ export interface VisualConnection {
   points: NodePosition[];
 }
 
+/**
+ * Visual workflow editor for creating and editing workflows graphically
+ * Supports node manipulation, connections, auto-layout, and SVG export
+ */
 export class VisualWorkflowEditor {
   private nodes: Map<string, VisualNode> = new Map();
   private connections: Map<string, VisualConnection> = new Map();

@@ -10,9 +10,13 @@ import type { AssetMeta } from '../types.js';
 import { createError, ErrorCode } from '../utils/errors.js';
 
 /**
- * 依赖管理MCP工具
+ * Dependency management MCP tools - provides dependency checking and graph analysis
  */
 
+/**
+ * Register dependency management MCP tools (check, dependents, dependencies, graph, detect circular)
+ * @returns Dependency tool handlers map
+ */
 export function registerDependencyTools() {
   return {
     check_dependencies: {

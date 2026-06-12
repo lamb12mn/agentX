@@ -4,6 +4,9 @@ import { getRemote } from '../../../remote/config.js';
 import { pushAsset } from '../../../remote/client.js';
 import { getAsset, listAssets } from '../../../store/assets.js';
 
+/**
+ * Register the `push` command — push assets to a remote endpoint
+ */
 export function registerPush(program: Command) {
     program
         .command('push <remote> [assetId]')

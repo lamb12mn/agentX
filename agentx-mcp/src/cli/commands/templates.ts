@@ -4,6 +4,9 @@ import { formatTable } from '../format.js';
 import chalk from 'chalk';
 import type { AssetType } from '../../types.js';
 
+/**
+ * Register the `templates` command — list available templates by type
+ */
 export function registerTemplateCommand(program: Command): void {
   program
     .command('templates [type]')
