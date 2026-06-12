@@ -46,6 +46,7 @@ function rowToMeta(row: Record<string, unknown>): AssetMeta {
   };
 }
 
+/** 创建新资产：写入文件并插入数据库记录 */
 export async function createAsset(
   input: CreateAssetInput,
   content: string,
@@ -103,6 +104,7 @@ export async function createAsset(
   return meta;
 }
 
+/** 根据 ID 获取资产元数据 */
 export async function getAsset(id: string): Promise<AssetMeta | null> {
   const db = getDb();
   const row = db.prepare('SELECT * FROM assets WHERE id = ?').get(id) as
@@ -111,6 +113,7 @@ export async function getAsset(id: string): Promise<AssetMeta | null> {
   return row ? rowToMeta(row) : null;
 }
 
+/** 列出资产，可选按类型过滤 */
 export async function listAssets(type?: AssetType): Promise<AssetMeta[]> {
   const db = getDb();
   const rows = type
@@ -119,6 +122,7 @@ export async function listAssets(type?: AssetType): Promise<AssetMeta[]> {
   return rows.map(rowToMeta);
 }
 
+/** 更新资产：修改数据库记录及可选的文件内容 */
 export async function updateAsset(id: string, input: UpdateAssetInput): Promise<AssetMeta> {
   const db = getDb();
   const now = Date.now();
@@ -163,6 +167,7 @@ export async function updateAsset(id: string, input: UpdateAssetInput): Promise<
   return meta;
 }
 
+/** 删除资产：移除文件和数据库记录 */
 export async function deleteAsset(id: string): Promise<void> {
   const db = getDb();
 
@@ -190,6 +195,7 @@ export async function deleteAsset(id: string): Promise<void> {
   }
 }
 
+/** 读取资产文件内容 */
 export async function readAssetContent(id: string): Promise<string> {
   const db = getDb();
   const row = db.prepare('SELECT file_path FROM assets WHERE id = ?').get(id) as
