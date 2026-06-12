@@ -43,6 +43,7 @@ function rowToMeta(row: Record<string, unknown>): AssetMeta {
   };
 }
 
+/** 搜索资产（使用 FTS5），支持类型过滤和结果缓存 */
 export async function searchAssets(
   query: string,
   type?: AssetType,
@@ -93,6 +94,7 @@ export async function searchAssets(
   return results;
 }
 
+/** 索引资产内容到 FTS5，并清空搜索缓存 */
 export async function indexAssetContent(id: string, content: string): Promise<void> {
   const db = getDb();
   db.prepare('UPDATE assets_fts SET content = ? WHERE id = ?').run(content, id);
