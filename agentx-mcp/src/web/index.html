@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AgentX Dashboard</title>
+    <style>
+        body { font-family: system-ui, sans-serif; margin: 2rem; background: #f5f5f5; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        h1 { color: #333; }
+        .card { background: white; border-radius: 8px; padding: 1rem; margin-bottom: 1rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .asset-list { list-style: none; padding: 0; }
+        .asset-item { border-bottom: 1px solid #eee; padding: 0.5rem 0; display: flex; justify-content: space-between; }
+        .asset-id { font-family: monospace; font-weight: bold; }
+        .asset-type { color: #666; font-size: 0.9rem; }
+        .loading { text-align: center; color: #666; }
+        .error { color: red; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>AgentX Dashboard</h1>
+    <div class="card">
+        <h2>Assets</h2>
+        <div id="assets-list" class="loading">Loading...</div>
+    </div>
+</div>
+<script>
+    async function fetchAssets() {
+        try {
+            const response = await fetch('/api/assets');
+            if (!response.ok) throw new Error('Failed to fetch');
+            const assets = await response.json();
+            const container = document.getElementById('assets-list');
+            if (assets.length === 0) {
+                container.innerHTML = '<p>No assets found.</p>';
+                return;
+            }
+            const ul = document.createElement('ul');
+            ul.className = 'asset-list';
+            for (const asset of assets) {
+                const li = document.createElement('li');
+                li.className = 'asset-item';
+                li.innerHTML = '<span class="asset-id">' + asset.id + '</span> <span class="asset-type">' + asset.type + '</span>';
+                ul.appendChild(li);
+            }
+            container.innerHTML = '';
+            container.appendChild(ul);
+        } catch (err) {
+            document.getElementById('assets-list').innerHTML = '<div class="error">Error: ' + err.message + '</div>';
+        }
+    }
+    fetchAssets();
+</script>
+</body>
+</html>

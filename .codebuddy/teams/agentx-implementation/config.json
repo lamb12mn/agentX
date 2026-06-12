@@ -1,0 +1,21 @@
+{
+  "name": "agentx-implementation",
+  "leadAgentId": "abd13f0e16ce4e7d95834dabbf283198",
+  "workspacePath": "d:/xiaoyue/mcps/agentX",
+  "createdAt": "2026-04-29T18:28:54.889Z",
+  "options": {
+    "workspacePath": "d:/xiaoyue/mcps/agentX"
+  },
+  "members": [
+    {
+      "memberId": "team-lead@agentx-implementation",
+      "name": "team-lead",
+      "role": "Team Lead - coordinates the team and interacts with the user"
+    },
+    {
+      "memberId": "agentx-closing-the-loop@agentx-implementation",
+      "name": "agentx-closing-the-loop",
+      "role": "实现AgentX功能闭环"
+    }
+  ]
+}

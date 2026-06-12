@@ -1,7 +1,6 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
 import { cloneAsset, getAsset } from '../store/assets.js';
-import { getConfig } from '../config.js';
 
 export function registerCloneCommand(program: Command): void {
   program
@@ -11,8 +10,7 @@ export function registerCloneCommand(program: Command): void {
     .option('-n, --name <name>', '新资产名称（可选）')
     .action(async (id: string, options: { name?: string }) => {
       try {
-        const config = getConfig();
-        const baseDir = config.baseDir;
+        const baseDir = process.env.AGENTX_DIR ?? process.cwd();
 
         // 验证源资产存在
         const sourceAsset = await getAsset(id);

@@ -1,4 +1,5 @@
 import { readFile, writeFile, unlink, mkdir } from 'fs/promises';
+import { logAudit } from '../audit/index.js';
 import { join, dirname, basename } from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { getDb } from './db.js';

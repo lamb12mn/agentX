@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Use Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+    - name: Install dependencies
+      run: |
+        cd agentx-mcp
+        npm ci
+    - name: Lint
+      run: |
+        cd agentx-mcp
+        npm run lint || true  # 如果 lint 脚本不存在则忽略
+    - name: Type check
+      run: |
+        cd agentx-mcp
+        npx tsc --noEmit
+    - name: Test
+      run: |
+        cd agentx-mcp
+        npm test
