@@ -33,26 +33,28 @@ try {
 // 2. 测试通过率检查 (30分)
 console.log('[2/4] 测试通过率检查...');
 try {
-  const output = execSync('npm test', { cwd: agentxDir, stdio: 'pipe', encoding: 'utf-8' });
-  const passMatch = output.match(/(\d+) passed/);
-  const failMatch = output.match(/(\d+) failed/);
-  const passed = passMatch ? parseInt(passMatch[1]) : 0;
-  const failed = failMatch ? parseInt(failMatch[1]) : 0;
+  const testOutput = execSync('npx vitest run --reporter=verbose 2>&1', { cwd: agentxDir, stdio: 'pipe', encoding: 'utf-8' });
+  // vitest v4 格式: "✓ tests/xxx.test.ts (N tests)" 或 "Tests  N passed"
+  const passedMatch = testOutput.match(/(\d+)\s+passed/);
+  const failedMatch = testOutput.match(/(\d+)\s+failed/);
+  const passed = passedMatch ? parseInt(passedMatch[1]) : 0;
+  const failed = failedMatch ? parseInt(failedMatch[1]) : 0;
   const total = passed + failed;
-  
-  if (total > 0) {
-    const rate = (passed / total) * 100;
-    scores.test = Math.round(rate * 0.3);
-    console.log(`  ✅ ${passed}/${total} 通过 (${scores.test}/30)`);
+  if (total > 0 && failed === 0) {
+    scores.test = 30;
+    console.log(`  ✅ ${passed}/${passed} tests passed (30/30)`);
+  } else if (total > 0) {
+    const ratio = passed / total;
+    scores.test = Math.round(30 * ratio);
+    console.log(`  ⚠️ ${passed}/${total} tests passed (${scores.test}/30)`);
   } else {
-    scores.test = 15;
-    console.log(`  ⚠️ 无测试 (15/30)`);
+    scores.test = 0;
+    console.log('  ❌ No tests found (0/30)');
   }
-} catch {
+} catch (e) {
   scores.test = 0;
-  console.log('  ❌ 测试失败 (0/30)');
+  console.log('  ❌ Test execution failed (0/30)');
 }
-
 // 3. 代码规范检查 (20分)
 console.log('[3/4] 代码规范检查...');
 let normScore = 0;
