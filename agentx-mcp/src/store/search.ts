@@ -3,6 +3,19 @@ import type { AssetMeta, AssetType, SearchResult } from '../types.js';
 
 export type { SearchResult };
 
+/**
+ * 转义 FTS5 查询中的特殊字符，防止注入攻击
+ * 移除/替换 FTS5 语法操作符，保留纯文本搜索语义
+ */
+function sanitizeFts5Query(query: string): string {
+  return query
+    .replace(/"/g, '')                              // 移除双引号（防止短语注入）
+    .replace(/[()*^\-+~]/g, ' ')                    // 替换 FTS5 操作符为空格
+    .replace(/\b(AND|OR|NOT)\b/gi, ' ')             // 移除布尔操作符关键字
+    .replace(/\s+/g, ' ')                           // 合并空白
+    .trim();
+}
+
 function rowToMeta(row: Record<string, unknown>): AssetMeta {
   return {
     id: row.id as string,
@@ -38,7 +51,10 @@ export async function searchAssets(
        ORDER BY fts.rank
        LIMIT ?`;
 
-  const params = type ? [query, type, limit] : [query, limit];
+  const safeQuery = sanitizeFts5Query(query);
+  if (!safeQuery) return [];
+
+  const params = type ? [safeQuery, type, limit] : [safeQuery, limit];
 
   let rows: Record<string, unknown>[];
   try {
