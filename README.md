@@ -58,7 +58,11 @@ npm install -g agentx-mcp
 # {
 #   "mcpServers": {
 #     "agentx": {
-#       "command": "agentx-mcp"
+#       "command": "agentx-mcp",
+#       "args": [],
+#       "env": {
+#         "AGENTX_DIR": "~/.agentx"
+#       }
 #     }
 #   }
 # }
