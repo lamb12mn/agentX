@@ -4,6 +4,7 @@ import { dirname } from 'path';
 
 let db: Database.Database | undefined;
 
+/** 初始化 SQLite 数据库，创建表结构和索引 */
 export function initDb(dbPath: string): void {
   mkdirSync(dirname(dbPath), { recursive: true });
   db = new Database(dbPath);
@@ -89,11 +90,13 @@ export function initDb(dbPath: string): void {
   `);
 }
 
+/** 获取数据库实例，未初始化时抛出错误 */
 export function getDb(): Database.Database {
   if (!db) throw new Error('DB not initialized. Call initDb() first.');
   return db;
 }
 
+/** 关闭数据库连接 */
 export function closeDb(): void {
   if (db) {
     db.close();
