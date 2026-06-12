@@ -127,7 +127,7 @@ npm link
 ```bash
 # 检查版本
 agentx --version
-# 输出: 1.0.0
+# 输出: 2.0.1
 
 # 查看帮助
 agentx --help
