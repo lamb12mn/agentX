@@ -7,7 +7,7 @@ import { exportAgent } from '../../export/claude.js';
 import type { AgentConfig, AssetType } from '../../types.js';
 import yaml from 'js-yaml';
 import chalk from 'chalk';
-import { exportAllToZip, exportAllToJson, exportAllToYaml } from '../../utils/zip.js';
+import { exportAsZip, exportAsJson, exportAsYaml } from '../../utils/zip.js';
 
 export function registerExportCommand(program: Command): void {
   program
@@ -85,11 +85,11 @@ export function registerExportCommand(program: Command): void {
       try {
         let outputPath: string;
         if (format === 'zip') {
-          outputPath = await exportAsZip({ baseDir, format, type }, opts.output);
+          outputPath = await exportAsZip(baseDir, opts.output);
         } else if (format === 'json') {
-          outputPath = await exportAsJson({ baseDir, format, type }, opts.output);
+          outputPath = await exportAsJson(baseDir, opts.output);
         } else if (format === 'yaml') {
-          outputPath = await exportAsYaml({ baseDir, format, type }, opts.output);
+          outputPath = await exportAsYaml(baseDir, opts.output);
         } else {
           console.error(chalk.red(`Unknown format: ${format}`));
           process.exit(1);
