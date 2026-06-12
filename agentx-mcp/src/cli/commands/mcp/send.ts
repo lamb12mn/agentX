@@ -6,8 +6,7 @@ import fs from 'fs';
 /**
  * Register the `mcp send` command — send a JSON-RPC message to an MCP server
  */
-export function registerMcpSend(program: Command) {
-    const mcp = program.command('mcp').description('MCP server commands');
+export function registerMcpSend(mcp: Command) {
     mcp
         .command('send')
         .description('Send a JSON-RPC message to an MCP server and print response')

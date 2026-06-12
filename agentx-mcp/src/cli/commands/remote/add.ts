@@ -5,8 +5,7 @@ import { addRemote } from '../../../remote/config.js';
 /**
  * Register the `remote add` command — add a remote AgentX endpoint
  */
-export function registerRemoteAdd(program: Command) {
-    const remote = program.command('remote').description('Remote management commands');
+export function registerRemoteAdd(remote: Command) {
     remote
         .command('add <name> <url>')
         .description('Add a remote AgentX endpoint')

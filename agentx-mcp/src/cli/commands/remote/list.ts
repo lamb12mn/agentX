@@ -5,8 +5,7 @@ import { loadRemotes } from '../../../remote/config.js';
 /**
  * Register the `remote list` command — list all configured remotes
  */
-export function registerRemoteList(program: Command) {
-    const remote = program.command('remote').description('Remote management commands');
+export function registerRemoteList(remote: Command) {
     remote
         .command('list')
         .description('List all configured remotes')

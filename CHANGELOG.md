@@ -9,8 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- README.md: 添加 AGENTX_DIR 环境变量配置说明及 MCP env 字段示例
-- README.md: 更新版本输出示例为 2.0.1
+- README: 统一快速开始中 MCP 配置示例，添加 args 和 env 字段
+- CI: 固定 GitHub Actions 第三方 action 版本为 commit SHA，防止供应链攻击
+
+### Security
+
+- 依赖: 运行 npm audit fix 修复已知漏洞
 
 
 ## [2.0.1] - 2026-06-13

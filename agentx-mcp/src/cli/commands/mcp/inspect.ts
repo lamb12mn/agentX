@@ -6,8 +6,7 @@ import readline from 'readline';
 /**
  * Register the `mcp inspect` command — interactive REPL to explore an MCP server
  */
-export function registerMcpInspect(program: Command) {
-    const mcp = program.command('mcp').description('MCP server commands');
+export function registerMcpInspect(mcp: Command) {
     mcp
         .command('inspect')
         .description('Start interactive REPL to explore an MCP server')

@@ -5,8 +5,7 @@ import { removeRemote } from '../../../remote/config.js';
 /**
  * Register the `remote remove` command — remove a remote endpoint
  */
-export function registerRemoteRemove(program: Command) {
-    const remote = program.command('remote').description('Remote management commands');
+export function registerRemoteRemove(remote: Command) {
     remote
         .command('remove <name>')
         .description('Remove a remote endpoint')

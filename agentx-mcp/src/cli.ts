@@ -47,15 +47,17 @@ registerBackupCommand(program);
 registerRestoreCommand(program);
 
 // Remote sync commands
-registerRemoteAdd(program);
-registerRemoteList(program);
-registerRemoteRemove(program);
-registerPull(program);
-registerPush(program);
+const remote = program.command('remote').description('Remote management commands');
+registerRemoteAdd(remote);
+registerRemoteList(remote);
+registerRemoteRemove(remote);
+registerPull(remote);
+registerPush(remote);
 
 // MCP tool commands
-registerMcpSend(program);
-registerMcpInspect(program);
+const mcp = program.command('mcp').description('MCP server commands');
+registerMcpSend(mcp);
+registerMcpInspect(mcp);
 
 // Asset management commands
 registerListCommand(program);
