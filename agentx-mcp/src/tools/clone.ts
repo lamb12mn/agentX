@@ -27,7 +27,15 @@ export function registerCloneTools(baseDir: string): {
         required: ['assetId'],
         description: 'Create a copy of an existing asset. The cloned asset inherits the content, tags, and dependencies of the original.',
       },
-      handler: async ({ assetId, newName }) => cloneAsset(assetId, newName, baseDir),
+      handler: async ({ assetId, newName }) => {
+        const cloned = await cloneAsset(assetId, newName, baseDir);
+        return {
+          success: true,
+          message: `Asset cloned successfully: ${cloned.name}`,
+          source: { id: cloned.id, name: cloned.name, type: cloned.type },
+          cloned: { id: cloned.id, name: cloned.name, type: cloned.type, file_path: cloned.file_path, tags: cloned.tags },
+        };
+      },
     },
   };
 }
