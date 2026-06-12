@@ -10,7 +10,8 @@ if (!fs.existsSync(AUDIT_DIR)) {
     fs.mkdirSync(AUDIT_DIR, { recursive: true });
 }
 
-export type AuditAction = 
+/** 审计日志支持的 action 类型 */
+export type AuditAction =
     | 'CREATE_ASSET'
     | 'UPDATE_ASSET'
     | 'DELETE_ASSET'
@@ -19,15 +20,23 @@ export type AuditAction =
     | 'EXPORT_ASSET'
     | 'CLONE_ASSET';
 
+/** 审计日志条目 */
 export interface AuditEntry {
+    /** ISO 时间戳 */
     timestamp: string;
+    /** 操作类型 */
     action: AuditAction;
+    /** 操作用户 ID */
     userId: string;
+    /** 关联资产 ID */
     assetId?: string;
+    /** 附加详情 */
     details?: any;
+    /** 客户端 IP */
     ip?: string;
 }
 
+/** 写入审计日志条目 */
 export function logAudit(entry: AuditEntry): void {
     const logLine = JSON.stringify(entry) + '\n';
     fs.appendFileSync(AUDIT_LOG_PATH, logLine, 'utf8');

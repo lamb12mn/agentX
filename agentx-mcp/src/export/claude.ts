@@ -2,6 +2,7 @@ import { writeFile, mkdir } from 'fs/promises';
 import { join } from 'path';
 import type { AgentConfig } from '../types.js';
 
+/** 将 Agent 配置导出为 CLAUDE.md + settings.json 格式 */
 export async function exportAgent(
   config: AgentConfig,
   outputDir: string

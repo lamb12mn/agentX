@@ -2,36 +2,57 @@ import { EventEmitter } from 'events';
 import type { AssetMeta, AssetType } from '../types.js';
 import type { PaginatedResult } from '../types/pagination.js';
 
+/** REST API 服务器配置 */
 export interface APIConfig {
+  /** 监听端口 */
   port: number;
+  /** 监听地址 */
   host: string;
+  /** 是否启用 CORS */
   cors: boolean;
+  /** 速率限制配置 */
   rateLimit: {
+    /** 时间窗口（毫秒） */
     windowMs: number;
+    /** 窗口内最大请求数 */
     max: number;
   };
+  /** API 认证密钥 */
   apiKey?: string;
 }
 
+/** REST API 响应格式 */
 export interface APIResponse<T = any> {
+  /** 是否成功 */
   success: boolean;
+  /** 响应数据 */
   data?: T;
+  /** 错误信息 */
   error?: string;
+  /** 提示信息 */
   message?: string;
 }
 
+/** REST API 请求格式 */
 export interface APIRequest {
+  /** HTTP 方法 */
   method: string;
+  /** 请求路径 */
   path: string;
+  /** 查询参数 */
   query: Record<string, string>;
+  /** 请求体 */
   body: any;
+  /** 请求头 */
   headers: Record<string, string>;
 }
 
+/** 中间件函数签名 */
 export interface Middleware {
   (req: APIRequest, res: APIResponse, next: () => void): void;
 }
 
+/** REST API 服务器 */
 export class RESTAPI extends EventEmitter {
   private config: APIConfig;
   private routes: Map<string, Map<string, Function>> = new Map();
