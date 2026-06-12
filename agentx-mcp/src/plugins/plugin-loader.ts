@@ -118,7 +118,7 @@ export class PluginLoader extends EventEmitter {
         pluginModule = this.require(mainFile);
       }
     } catch (error) {
-      throw new Error(`Failed to load plugin module: ${error.message}`);
+      throw new Error(`Failed to load plugin module: ${error instanceof Error ? error.message : String(error)}`);
     }
 
     const plugin: Plugin = {
