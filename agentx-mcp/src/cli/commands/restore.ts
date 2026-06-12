@@ -44,7 +44,7 @@ export function registerRestoreCommand(program: Command) {
                 execSync(`tar -xzf "${backupPath}" -C "${tempDir}"`, { stdio: 'inherit' });
                 
                 // 复制所有文件到当前目录（保持相对路径结构）
-                const copyRecursive = (src, dest) => {
+                const copyRecursive = (src: string, dest: string) => {
                     if (!fs.existsSync(dest)) fs.mkdirSync(dest, { recursive: true });
                     const entries = fs.readdirSync(src);
                     for (const entry of entries) {

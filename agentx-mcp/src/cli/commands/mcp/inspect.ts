@@ -4,8 +4,9 @@ import { spawn } from 'child_process';
 import readline from 'readline';
 
 export function registerMcpInspect(program: Command) {
-    program
-        .command('mcp inspect')
+    const mcp = program.command('mcp').description('MCP server commands');
+    mcp
+        .command('inspect')
         .description('Start interactive REPL to explore an MCP server')
         .option('-s, --server <command>', 'Server command to run', 'npx -y @modelcontextprotocol/server-filesystem')
         .action(async (options) => {

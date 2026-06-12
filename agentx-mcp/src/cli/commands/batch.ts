@@ -106,11 +106,12 @@ export function registerBatchCommand(program: Command): void {
 
   const tagCmd = new Command('tag')
     .description('Add or remove tags from multiple assets')
-    .argument('<ids...>', 'Asset IDs to modify')
+    .argument('<ids>', 'Asset IDs to modify (comma-separated)')
     .argument('<action>', 'Action: add|remove')
     .argument('<tags...>', 'Tags to add/remove')
     .option('-y, --yes', 'Skip confirmation prompt')
-    .action(async (ids: string[], action: 'add' | 'remove', tags: string[], options: { yes?: boolean }) => {
+    .action(async (idsStr: string, action: 'add' | 'remove', tags: string[], options: { yes?: boolean }) => {
+      const ids = idsStr.split(',').map(s => s.trim());
       if (action !== 'add' && action !== 'remove') {
         console.error(chalk.red('Invalid action. Use "add" or "remove"'));
         process.exit(1);

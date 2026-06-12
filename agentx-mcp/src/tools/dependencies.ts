@@ -28,7 +28,7 @@ export function registerDependencyTools() {
         required: ['id'],
         description: 'Returns safe: true if no other assets depend on this asset.',
       },
-      handler: async ({ id }) => {
+      handler: async ({ id }: { id: string }) => {
         const asset = await getAsset(id);
         if (!asset) {
           throw createError('ASSET_NOT_FOUND', { assetId: id });
@@ -60,7 +60,7 @@ export function registerDependencyTools() {
         required: ['id'],
         description: 'Returns list of asset IDs that depend on this asset.',
       },
-      handler: async ({ id }) => {
+      handler: async ({ id }: { id: string }) => {
         const asset = await getAsset(id);
         if (!asset) {
           throw createError('ASSET_NOT_FOUND', { assetId: id });
@@ -98,7 +98,7 @@ export function registerDependencyTools() {
         required: ['id'],
         description: 'Returns list of asset IDs that this asset depends on.',
       },
-      handler: async ({ id }) => {
+      handler: async ({ id }: { id: string }) => {
         const asset = await getAsset(id);
         if (!asset) {
           throw createError('ASSET_NOT_FOUND', { assetId: id });
@@ -136,7 +136,7 @@ export function registerDependencyTools() {
         required: ['id'],
         description: 'Returns complete dependency graph including transitive dependencies.',
       },
-      handler: async ({ id }) => {
+      handler: async ({ id }: { id: string }) => {
         const asset = await getAsset(id);
         if (!asset) {
           throw createError('ASSET_NOT_FOUND', { assetId: id });
@@ -165,7 +165,7 @@ export function registerDependencyTools() {
         required: ['id'],
         description: 'Returns true if a circular dependency is found.',
       },
-      handler: async ({ id }) => {
+      handler: async ({ id }: { id: string }) => {
         const asset = await getAsset(id);
         if (!asset) {
           throw createError('ASSET_NOT_FOUND', { assetId: id });

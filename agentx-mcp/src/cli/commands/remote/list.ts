@@ -3,8 +3,9 @@ import chalk from 'chalk';
 import { loadRemotes } from '../../../remote/config.js';
 
 export function registerRemoteList(program: Command) {
-    program
-        .command('remote list')
+    const remote = program.command('remote').description('Remote management commands');
+    remote
+        .command('list')
         .description('List all configured remotes')
         .action(() => {
             const remotes = loadRemotes();

@@ -10,7 +10,9 @@
   "main": "dist/index.js",
   "files": [
     "dist/",
-    "README.md"
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
   ],
   "engines": {
     "node": ">=18"
@@ -22,7 +24,9 @@
     "start:enhanced": "set AGENTX_ENHANCED=true && node dist/index.js",
     "test": "vitest run",
     "test:enhanced": "vitest run --config vitest.enhanced.config.ts",
-    "prepublishOnly": "npm run build && npm test",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src/ tests/ --ext .ts",
+    "prepublishOnly": "npm run build && npm run typecheck && npm test",
     "dev": "tsx watch src/index.ts",
     "dev:enhanced": "set AGENTX_ENHANCED=true && tsx watch src/index.ts",
     "web": "tsx src/web/server.ts"

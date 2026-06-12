@@ -4,7 +4,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import { homedir } from 'os';
 import { join } from 'path';
-import { initDb } from './store/db.js';
+import { initDb, closeDb } from './store/db.js';
 import { registerSkillTools } from './tools/skills.js';
 import { registerAgentTools } from './tools/agents.js';
 import { registerPromptTools } from './tools/prompts.js';
@@ -422,6 +422,7 @@ function shutdown(): void {
   if (ENHANCED && cloudSync) cloudSync.destroy();
   if (ENHANCED && monitoringDashboard) monitoringDashboard.stop();
   if (ENHANCED && restApi) restApi.stop();
+  closeDb();
   server.close();
   process.exit(0);
 }

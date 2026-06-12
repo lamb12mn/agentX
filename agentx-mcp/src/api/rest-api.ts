@@ -207,33 +207,33 @@ export class RESTAPI extends EventEmitter {
     }));
 
     // 资产相关路由
-    this.registerRoute('GET', '/api/assets', async (req) => {
+    this.registerRoute('GET', '/api/assets', async (req: any) => {
       // 这里应该调用实际的资产列表函数
       return { assets: [], total: 0 };
     });
 
-    this.registerRoute('GET', '/api/assets/:id', async (req) => {
+    this.registerRoute('GET', '/api/assets/:id', async (req: any) => {
       // 这里应该调用实际的资产获取函数
       return { asset: null };
     });
 
-    this.registerRoute('POST', '/api/assets', async (req) => {
+    this.registerRoute('POST', '/api/assets', async (req: any) => {
       // 这里应该调用实际的资产创建函数
       return { asset: null };
     });
 
-    this.registerRoute('PUT', '/api/assets/:id', async (req) => {
+    this.registerRoute('PUT', '/api/assets/:id', async (req: any) => {
       // 这里应该调用实际的资产更新函数
       return { asset: null };
     });
 
-    this.registerRoute('DELETE', '/api/assets/:id', async (req) => {
+    this.registerRoute('DELETE', '/api/assets/:id', async (req: any) => {
       // 这里应该调用实际的资产删除函数
       return { success: true };
     });
 
     // 分页查询
-    this.registerRoute('GET', '/api/assets/paginated', async (req) => {
+    this.registerRoute('GET', '/api/assets/paginated', async (req: any) => {
       // 这里应该调用实际的分页查询函数
       return {
         data: [],
@@ -249,17 +249,17 @@ export class RESTAPI extends EventEmitter {
     });
 
     // 批量操作
-    this.registerRoute('POST', '/api/assets/batch/delete', async (req) => {
+    this.registerRoute('POST', '/api/assets/batch/delete', async (req: any) => {
       // 这里应该调用实际的批量删除函数
       return { deleted: [], blocked: [], errors: [] };
     });
 
-    this.registerRoute('POST', '/api/assets/batch/tags/add', async (req) => {
+    this.registerRoute('POST', '/api/assets/batch/tags/add', async (req: any) => {
       // 这里应该调用实际的批量添加标签函数
       return { updated: [], errors: [] };
     });
 
-    this.registerRoute('POST', '/api/assets/batch/tags/remove', async (req) => {
+    this.registerRoute('POST', '/api/assets/batch/tags/remove', async (req: any) => {
       // 这里应该调用实际的批量移除标签函数
       return { updated: [], errors: [] };
     });
@@ -269,7 +269,7 @@ export class RESTAPI extends EventEmitter {
       return { workflows: [] };
     });
 
-    this.registerRoute('POST', '/api/workflows/execute', async (req) => {
+    this.registerRoute('POST', '/api/workflows/execute', async (req: any) => {
       return { execution: null };
     });
 

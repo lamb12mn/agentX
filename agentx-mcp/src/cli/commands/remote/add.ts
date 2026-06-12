@@ -3,8 +3,9 @@ import chalk from 'chalk';
 import { addRemote } from '../../../remote/config.js';
 
 export function registerRemoteAdd(program: Command) {
-    program
-        .command('remote add <name> <url>')
+    const remote = program.command('remote').description('Remote management commands');
+    remote
+        .command('add <name> <url>')
         .description('Add a remote AgentX endpoint')
         .option('--api-key <key>', 'API key for authentication')
         .action(async (name: string, url: string, options: { apiKey?: string }) => {

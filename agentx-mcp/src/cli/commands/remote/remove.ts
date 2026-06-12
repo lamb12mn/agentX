@@ -3,8 +3,9 @@ import chalk from 'chalk';
 import { removeRemote } from '../../../remote/config.js';
 
 export function registerRemoteRemove(program: Command) {
-    program
-        .command('remote remove <name>')
+    const remote = program.command('remote').description('Remote management commands');
+    remote
+        .command('remove <name>')
         .description('Remove a remote endpoint')
         .action(async (name: string) => {
             try {

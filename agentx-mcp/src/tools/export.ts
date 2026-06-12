@@ -29,7 +29,7 @@ export function registerExportTools(baseDir: string) {
         required: ['id'],
         description: 'Export a single agent to CLAUDE.md and settings.json files.',
       },
-      handler: async ({ id, output_dir = '.' }) => {
+      handler: async ({ id, output_dir = '.' }: { id: string; output_dir?: string }) => {
         const asset = await getAsset(id);
         if (!asset) {
           throw createError('ASSET_NOT_FOUND', { assetId: id });
@@ -82,7 +82,7 @@ export function registerExportTools(baseDir: string) {
         },
         description: 'Export all assets. Format "claude" exports agents only to CLAUDE.md format. Other formats export all assets.',
       },
-      handler: async ({ format = 'claude', type, output }) => {
+      handler: async ({ format = 'claude', type, output }: { format?: string; type?: string; output?: string }) => {
         const baseDir = process.env.AGENTX_DIR ?? join(homedir(), '.agentx');
 
         if (format === 'claude') {

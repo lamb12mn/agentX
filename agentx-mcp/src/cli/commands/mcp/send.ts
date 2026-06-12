@@ -4,8 +4,9 @@ import { spawn } from 'child_process';
 import fs from 'fs';
 
 export function registerMcpSend(program: Command) {
-    program
-        .command('mcp send')
+    const mcp = program.command('mcp').description('MCP server commands');
+    mcp
+        .command('send')
         .description('Send a JSON-RPC message to an MCP server and print response')
         .option('-s, --server <command>', 'Server command to run (e.g. "node server.js")', 'npx -y @modelcontextprotocol/server-filesystem')
         .option('-m, --message <json>', 'JSON-RPC message as string')

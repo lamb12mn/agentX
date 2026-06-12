@@ -1,7 +1,21 @@
 import { getDb } from './db.js';
 import type { AssetMeta, AssetType, SearchResult } from '../types.js';
+import { LRUCache } from 'lru-cache';
 
 export type { SearchResult };
+
+/**
+ * 搜索缓存：相同查询 30 秒内直接返回缓存结果
+ */
+const searchCache = new LRUCache<string, SearchResult[]>({
+  max: 100,
+  ttl: 1000 * 30,
+  updateAgeOnGet: true,
+});
+
+function searchCacheKey(query: string, type?: AssetType, limit?: number): string {
+  return `${query}::${type ?? '*' }::${limit ?? 20}`;
+}
 
 /**
  * 转义 FTS5 查询中的特殊字符，防止注入攻击
@@ -34,6 +48,14 @@ export async function searchAssets(
   type?: AssetType,
   limit = 20
 ): Promise<SearchResult[]> {
+  const safeQuery = sanitizeFts5Query(query);
+  if (!safeQuery) return [];
+
+  // 检查缓存
+  const cacheKey = searchCacheKey(safeQuery, type, limit);
+  const cached = searchCache.get(cacheKey);
+  if (cached) return cached;
+
   const db = getDb();
 
   // Use FTS5 with rank for scoring
@@ -51,9 +73,6 @@ export async function searchAssets(
        ORDER BY fts.rank
        LIMIT ?`;
 
-  const safeQuery = sanitizeFts5Query(query);
-  if (!safeQuery) return [];
-
   const params = type ? [safeQuery, type, limit] : [safeQuery, limit];
 
   let rows: Record<string, unknown>[];
@@ -64,13 +83,19 @@ export async function searchAssets(
     return [];
   }
 
-  return rows.map(row => ({
+  const results = rows.map(row => ({
     meta: rowToMeta(row),
     score: -(row.fts_rank as number), // rank is negative in FTS5
   }));
+
+  // 写入缓存
+  searchCache.set(cacheKey, results);
+  return results;
 }
 
 export async function indexAssetContent(id: string, content: string): Promise<void> {
   const db = getDb();
   db.prepare('UPDATE assets_fts SET content = ? WHERE id = ?').run(content, id);
+  // 内容变更后清空搜索缓存
+  searchCache.clear();
 }
