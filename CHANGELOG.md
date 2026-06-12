@@ -10,14 +10,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [2.0.1] - 2026-06-13
 
 ### Added
-- ISC LICENSE 文件 (Copyright 2026 AgentX Contributors)
-- vitest.config.ts 测试配置文件
+
+- ISC LICENSE file (Copyright 2026 AgentX Contributors)
+- `vitest.config.ts` test configuration file
 
 ### Fixed
-- README.md 中 MCP 工具数量描述统一更正为 33 个
 
-### Fixed
-- Vitest 测试环境: 添加 vitest.config.ts 修复 runner 查找失败和 config undefined 错误
+- README.md MCP tool count corrected from 19 to 33
+- Vitest test infrastructure: added `vitest.config.ts` to resolve runner lookup failure and `config undefined` error (9/9 suites, 60/60 tests passing)
 
 ## [2.0.0] - 2026-06-12
 
@@ -289,3 +289,9 @@ npm install -g agentx-mcp@1.0.0
 ---
 
 **保持更新，持续发布** 🚀
+
+
+[unreleased]: https://github.com/agentx/agentx-mcp/compare/v2.0.1...HEAD
+[2.0.1]: https://github.com/agentx/agentx-mcp/compare/v2.0.0...v2.0.1
+[2.0.0]: https://github.com/agentx/agentx-mcp/compare/v1.0.0...v2.0.0
+[1.0.0]: https://github.com/agentx/agentx-mcp/releases/tag/v1.0.0
