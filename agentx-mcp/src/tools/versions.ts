@@ -47,7 +47,7 @@ export function registerVersionTools(): {
         required: ['assetId'],
       },
       handler: async ({ assetId, createdBy }) => {
-        const version = createVersionSnapshot(assetId, createdBy);
+        const version = await createVersionSnapshot(assetId, createdBy);
         return { version, message: `Snapshot created: version ${version}` };
       },
     },
@@ -97,11 +97,11 @@ export function registerVersionTools(): {
       handler: async ({ assetId, version }) => {
         const v = getVersion(assetId, version);
         if (!v) {
-          return { error: `Version ${version} not found for asset ${assetId}` };
+          throw new Error(`Version ${version} not found for asset ${assetId}`);
         }
         return {
           version: v.version,
-          meta: v.snapshot_data.meta,
+          meta: v.snapshot_data.meta as Record<string, unknown>,
           content: v.snapshot_data.content,
           created_at: v.created_at,
           created_by: v.created_by,
