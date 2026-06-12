@@ -66,7 +66,7 @@ export class PluginLoader extends EventEmitter {
   private async loadPluginFromFile(filePath: string): Promise<void> {
     try {
       const manifestPath = filePath.replace(/\.(js|ts)$/, '.json');
-      const manifest = await this.readManifest(manifestPath);
+      let manifest = await this.readManifest(manifestPath);
       
       if (!manifest) {
         // 如果没有manifest文件，从文件名推断
@@ -124,7 +124,7 @@ export class PluginLoader extends EventEmitter {
     const plugin: Plugin = {
       manifest,
       module: pluginModule,
-      api: {},
+      api: {} as PluginAPI,
       enabled: true,
     };
 
@@ -143,7 +143,7 @@ export class PluginLoader extends EventEmitter {
       version: plugin.manifest.version,
       registerHook: (hook, handler) => {
         this.emit('hookRegistered', { plugin: plugin.manifest.name, hook });
-        return this.on(hook, handler);
+        return this.on(hook, handler as (...args: any[]) => void);
       },
       emitEvent: (event, data) => {
         this.emit(event, { plugin: plugin.manifest.name, data });
