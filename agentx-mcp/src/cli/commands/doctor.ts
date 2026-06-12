@@ -41,7 +41,7 @@ export function registerDoctorCommand(program: Command) {
             if (fs.existsSync(pkgPath)) {
                 const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
                 const deps = { ...pkg.dependencies, ...pkg.devDependencies };
-                const missingDeps = [];
+                const missingDeps: string[] = [];
                 for (const dep of Object.keys(deps)) {
                     try {
                         require.resolve(dep, { paths: [process.cwd()] });
