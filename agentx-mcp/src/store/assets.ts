@@ -9,6 +9,7 @@ import {
   getDependents as getDependentsFromDeps,
   getDependencies as getDependenciesFromDeps,
   detectCircularDependency as detectCircularFromDeps,
+  addDependency,
 } from './dependencies.js';
 import type { AssetMeta, AssetType } from '../types.js';
 import chalk from 'chalk';
