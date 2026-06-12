@@ -21,7 +21,7 @@ export function registerMcpSend(program: Command) {
             try {
                 message = JSON.parse(messageStr);
             } catch (e) {
-                console.error(chalk.red('Invalid JSON:'), e.message);
+                console.error(chalk.red('Invalid JSON:'), e instanceof Error ? e.message : String(e));
                 process.exit(1);
             }
             
