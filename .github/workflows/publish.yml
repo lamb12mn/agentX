@@ -4,6 +4,7 @@ on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
 
 jobs:
   publish:
@@ -18,7 +19,7 @@ jobs:
           node-version: '20'
           registry-url: 'https://registry.npmjs.org'
       - name: Install dependencies
-        run: cd agentx-mcp && npm ci
+        run: cd agentx-mcp && npm install --no-audit --no-fund
       - name: Build
         run: cd agentx-mcp && npm run build
       - name: Test
