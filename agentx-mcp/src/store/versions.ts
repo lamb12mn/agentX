@@ -177,7 +177,7 @@ export async function rollbackToVersion(assetId: string, version: number): Promi
   return {
     ...meta,
     updated_at: now,
-  };
+  } as AssetMeta;
 }
 
 /**
