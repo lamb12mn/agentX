@@ -1,6 +1,6 @@
 {
   "name": "agentx-mcp",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "Local-first agent factory MCP Server for Claude Code with enhanced features",
   "type": "module",
   "bin": {

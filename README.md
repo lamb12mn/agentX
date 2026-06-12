@@ -170,7 +170,7 @@ AgentX 可以作为 MCP 服务器运行，供 Claude Code 调用。
 
 #### 可用工具列表
 
-Claude Code 中可以使用的工具（共 19 个）：
+Claude Code 中可以使用的工具（共 33 个）：
 
 **Skills 管理**（5 个）：
 - `list_skills` - 列出所有技能

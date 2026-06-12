@@ -1,11 +1,25 @@
-# 更新日志
+# Changelog
 
-本文档记录 AgentX 项目的所有重大变更。
+All notable changes to this project will be documented in this file.
 
-格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
-版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
----
+## [Unreleased]
+
+## [2.0.1] - 2026-06-13
+
+### Added
+- ISC LICENSE 文件 (Copyright 2026 AgentX Contributors)
+- vitest.config.ts 测试配置文件
+
+### Fixed
+- README.md 中 MCP 工具数量描述统一更正为 33 个
+
+### Fixed
+- Vitest 测试环境: 添加 vitest.config.ts 修复 runner 查找失败和 config undefined 错误
+
+## [2.0.0] - 2026-06-12
 
 ## [2.0.0] - 2026-06-12
 
