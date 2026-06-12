@@ -71,7 +71,7 @@ export function registerRestoreCommand(program: Command) {
                 
                 console.log(chalk.green('Restore completed successfully.'));
             } catch (err) {
-                console.error(chalk.red('Restore failed:'), err.message);
+                console.error(chalk.red('Restore failed:'), err instanceof Error ? err.message : String(err));
                 process.exit(1);
             } finally {
                 fs.rmSync(tempDir, { recursive: true, force: true });
