@@ -33,9 +33,15 @@ try {
 // 2. 测试通过率检查 (30分)
 console.log('[2/4] 测试通过率检查...');
 try {
-  const testOutput = execSync('npx vitest run --reporter=verbose 2>&1', { cwd: agentxDir, stdio: 'pipe', encoding: 'utf-8' });
-  // vitest v4 格式: "✓ tests/xxx.test.ts (N tests)" 或 "Tests  N passed"
-  const passedMatch = testOutput.match(/(\d+)\s+passed/);
+  let testOutput = '';
+  try {
+    testOutput = execSync('npx vitest run --reporter=verbose 2>&1', { cwd: agentxDir, stdio: 'pipe', encoding: 'utf-8' });
+  } catch (execError) {
+    // vitest may exit with non-zero even when tests pass (e.g., coverage threshold)
+    testOutput = execError.stdout || execError.stderr || execError.message || '';
+  }
+  // vitest v4 format: "Tests  N passed" or "✓ N tests"
+  const passedMatch = testOutput.match(/(\d+)\s+passed/) || testOutput.match(/✓.*?(\d+)\s+tests?/);
   const failedMatch = testOutput.match(/(\d+)\s+failed/);
   const passed = passedMatch ? parseInt(passedMatch[1]) : 0;
   const failed = failedMatch ? parseInt(failedMatch[1]) : 0;
@@ -50,10 +56,12 @@ try {
   } else {
     scores.test = 0;
     console.log('  ❌ No tests found (0/30)');
+    console.log('  Debug output:', testOutput.substring(0, 200));
   }
 } catch (e) {
   scores.test = 0;
   console.log('  ❌ Test execution failed (0/30)');
+  console.log('  Error:', e.message?.substring(0, 200));
 }
 // 3. 代码规范检查 (20分)
 console.log('[3/4] 代码规范检查...');
