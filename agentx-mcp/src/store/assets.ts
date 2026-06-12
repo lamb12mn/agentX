@@ -1,6 +1,6 @@
 import { readFile, writeFile, unlink, mkdir } from 'fs/promises';
 import { logAudit } from '../audit/index.js';
-import { join, dirname, basename } from 'path';
+import { join, dirname, basename, resolve } from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { getDb } from './db.js';
 import { indexAssetContent } from './search.js';
@@ -56,6 +56,13 @@ export async function createAsset(
   const ext = fileExtension(input.type);
   const safeName = basename(input.name).replace(/[^a-zA-Z0-9_\-. ]/g, '_');
   const filePath = join(baseDir, input.type + 's', `${safeName}${ext}`);
+
+  // 路径遍历防护：确保最终路径在 baseDir 之内
+  const resolvedBase = resolve(baseDir);
+  const resolvedPath = resolve(filePath);
+  if (!resolvedPath.startsWith(resolvedBase)) {
+    throw new Error(`Path traversal detected for asset "${input.name}"`);
+  }
 
   await mkdir(dirname(filePath), { recursive: true });
   await writeFile(filePath, content, 'utf-8');
