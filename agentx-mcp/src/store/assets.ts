@@ -64,8 +64,12 @@ export async function createAsset(
     throw new Error(`Path traversal detected for asset "${input.name}"`);
   }
 
-  await mkdir(dirname(filePath), { recursive: true });
-  await writeFile(filePath, content, 'utf-8');
+  try {
+    await mkdir(dirname(filePath), { recursive: true });
+    await writeFile(filePath, content, 'utf-8');
+  } catch {
+    throw new Error(`Failed to write asset file: ${id}`);
+  }
 
   const db = getDb();
   db.prepare(
@@ -84,9 +88,19 @@ export async function createAsset(
 
   await indexAssetContent(id, content);
 
-  return rowToMeta(
+  const meta = rowToMeta(
     db.prepare('SELECT * FROM assets WHERE id = ?').get(id) as Record<string, unknown>
   );
+
+  logAudit({
+    timestamp: new Date().toISOString(),
+    action: 'CREATE_ASSET',
+    userId: 'system',
+    assetId: id,
+    details: { type: input.type, name: input.name },
+  });
+
+  return meta;
 }
 
 export async function getAsset(id: string): Promise<AssetMeta | null> {
@@ -120,19 +134,33 @@ export async function updateAsset(id: string, input: UpdateAssetInput): Promise<
   const tags = input.tags !== undefined ? JSON.stringify(input.tags) : (existing.tags as string);
 
   if (input.content !== undefined) {
-    const filePath = existing.file_path as string;
-    await mkdir(dirname(filePath), { recursive: true });
-    await writeFile(filePath, input.content, 'utf-8');
-    await indexAssetContent(id, input.content);
+    try {
+      const filePath = existing.file_path as string;
+      await mkdir(dirname(filePath), { recursive: true });
+      await writeFile(filePath, input.content, 'utf-8');
+      await indexAssetContent(id, input.content);
+    } catch {
+      throw new Error(`Failed to update asset file: ${id}`);
+    }
   }
 
   db.prepare(
     `UPDATE assets SET name = ?, description = ?, tags = ?, updated_at = ? WHERE id = ?`
   ).run(name, description, tags, now, id);
 
-  return rowToMeta(
+  const meta = rowToMeta(
     db.prepare('SELECT * FROM assets WHERE id = ?').get(id) as Record<string, unknown>
   );
+
+  logAudit({
+    timestamp: new Date().toISOString(),
+    action: 'UPDATE_ASSET',
+    userId: 'system',
+    assetId: id,
+    details: { changes: Object.keys(input).filter(k => input[k as keyof UpdateAssetInput] !== undefined) },
+  });
+
+  return meta;
 }
 
 export async function deleteAsset(id: string): Promise<void> {
@@ -152,6 +180,13 @@ export async function deleteAsset(id: string): Promise<void> {
       // file may already be gone
     }
     db.prepare('DELETE FROM assets WHERE id = ?').run(id);
+
+    logAudit({
+      timestamp: new Date().toISOString(),
+      action: 'DELETE_ASSET',
+      userId: 'system',
+      assetId: id,
+    });
   }
 }
 
@@ -161,7 +196,11 @@ export async function readAssetContent(id: string): Promise<string> {
     | { file_path: string }
     | undefined;
   if (!row) throw new Error(`Asset not found: ${id}`);
-  return readFile(row.file_path, 'utf-8');
+  try {
+    return await readFile(row.file_path, 'utf-8');
+  } catch {
+    throw new Error(`Failed to read asset content: ${id}`);
+  }
 }
 
 /**
@@ -270,6 +309,16 @@ export async function batchDeleteAssets(
   });
 
   transaction(Array.from(existingAssets));
+
+  // 批量操作审计日志
+  if (result.deleted.length > 0) {
+    logAudit({
+      timestamp: new Date().toISOString(),
+      action: 'BATCH_DELETE',
+      userId: 'system',
+      details: { count: result.deleted.length, ids: result.deleted },
+    });
+  }
 
   return result;
 }
