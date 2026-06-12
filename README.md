@@ -624,3 +624,36 @@ npm update -g agentx-mcp
 **⭐ 如果这个项目对您有帮助，请给我们一个 Star！**
 
 *最后更新：2026-04-29*
+
+### 环境变量配置
+
+| 变量 | 默认值 | 说明 |
+|---|---|---|
+| `AGENTX_DIR` | `~/.agentx/` | 自定义数据存储根目录（SQLite 数据库 + 资产文件） |
+
+**MCP 服务器配置示例**（仅对 MCP 实例生效）：
+```json
+{
+  "mcpServers": {
+    "agentx": {
+      "command": "agentx-mcp",
+      "args": [],
+      "env": {
+        "AGENTX_DIR": "D:/my-agentx-data"
+      }
+    }
+  }
+}
+```
+
+**CLI 使用**：需在运行前设置系统环境变量或在 shell 配置文件中持久化：
+```bash
+# Linux / macOS
+export AGENTX_DIR="/path/to/custom/dir"
+
+# Windows PowerShell
+$env:AGENTX_DIR = "D:\my-agentx-data"
+```
+
+> ⚠️ CLI 不会读取 MCP 配置中的 `env`，需单独设置以确保两者访问同一份数据。
+

@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- README.md: 添加 AGENTX_DIR 环境变量配置说明及 MCP env 字段示例
+- README.md: 更新版本输出示例为 2.0.1
+
+
 ## [2.0.1] - 2026-06-13
 
 ### Added
