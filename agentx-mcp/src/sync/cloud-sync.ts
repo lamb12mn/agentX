@@ -270,7 +270,7 @@ export class CloudSyncService extends EventEmitter {
   private async checkConflict(change: AssetMeta): Promise<boolean> {
     // 简化实现：检查本地是否有更新的版本
     const localVersion = await this.getLocalVersion(change.id);
-    return localVersion && localVersion.updated_at > change.updated_at;
+    return localVersion ? localVersion.updated_at > change.updated_at : false;
   }
 
   /**
