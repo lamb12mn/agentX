@@ -10,6 +10,7 @@ export interface APIConfig {
     windowMs: number;
     max: number;
   };
+  apiKey?: string;
 }
 
 export interface APIResponse<T = any> {
@@ -59,6 +60,12 @@ export class RESTAPI extends EventEmitter {
   async start(): Promise<void> {
     if (this.isRunning) {
       throw new Error('API server is already running');
+    }
+
+    // 注册认证中间件（如果配置了 API key）
+    const apiKey = this.config.apiKey || process.env.AGENTX_API_KEY;
+    if (apiKey) {
+      this.addAuthMiddleware(apiKey);
     }
 
     // 注册默认路由
