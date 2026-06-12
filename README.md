@@ -162,7 +162,10 @@ AgentX 可以作为 MCP 服务器运行，供 Claude Code 调用。
   "mcpServers": {
     "agentx": {
       "command": "agentx-mcp",
-      "args": []
+      "args": [],
+      "env": {
+        "AGENTX_DIR": "~/.agentx"
+      }
     }
   }
 }
