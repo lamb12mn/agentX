@@ -52,7 +52,7 @@ export function registerBackupCommand(program: Command) {
                 execSync(tarCmd, { stdio: 'inherit' });
                 console.log(chalk.green(`Backup saved to ${outputPath}`));
             } catch (err) {
-                console.error(chalk.red('Backup failed:'), err.message);
+                console.error(chalk.red('Backup failed:'), err instanceof Error ? err.message : String(err));
                 process.exit(1);
             } finally {
                 fs.unlinkSync(tempListPath);

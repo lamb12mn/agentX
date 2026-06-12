@@ -1,6 +1,6 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
-import { cloneAsset, getAsset } from '../store/assets.js';
+import { cloneAsset, getAsset } from '../../store/assets.js';
 
 export function registerCloneCommand(program: Command): void {
   program

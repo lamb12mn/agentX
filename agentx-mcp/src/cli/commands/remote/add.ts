@@ -1,6 +1,6 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
-import { addRemote } from '../../remote/config.js';
+import { addRemote } from '../../../remote/config.js';
 
 export function registerRemoteAdd(program: Command) {
     program

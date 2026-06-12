@@ -1,6 +1,6 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
-import { removeRemote } from '../../remote/config.js';
+import { removeRemote } from '../../../remote/config.js';
 
 export function registerRemoteRemove(program: Command) {
     program

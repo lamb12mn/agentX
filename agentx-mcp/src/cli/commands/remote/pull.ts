@@ -1,8 +1,8 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
-import { getRemote } from '../../remote/config.js';
-import { fetchAssets, fetchAsset } from '../../remote/client.js';
-import { createAsset, updateAsset } from '../../store/assets.js';
+import { getRemote } from '../../../remote/config.js';
+import { fetchAssets, fetchAsset } from '../../../remote/client.js';
+import { createAsset, updateAsset } from '../../../store/assets.js';
 
 export function registerPull(program: Command) {
     program
