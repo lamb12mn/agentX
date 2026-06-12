@@ -1,0 +1,25 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+*.tsbuildinfo
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Auto-generated project artifacts
+autoresearch/
+.codegraph/
+.promptx/
+.codebuddy/
+
+# Stray files
+k.includes('multi')

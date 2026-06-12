@@ -1,4 +1,5 @@
-import { createWriteStream, mkdir } from 'fs';
+import { createWriteStream } from 'fs';
+import { mkdir } from 'fs/promises';
 import { join, dirname } from 'path';
 import { getAsset, listAssets, readAssetContent } from '../store/assets.js';
 import archiver from 'archiver';
@@ -36,8 +37,8 @@ export async function exportAllToZip(
     archive.pipe(output);
 
     // 添加元数据清单
-    archive.file(
-      Buffer.from(JSON.stringify({
+    archive.append(
+      JSON.stringify({
         version: '1.0.0',
         exported_at: new Date().toISOString(),
         total_assets: assets.length,
@@ -47,7 +48,7 @@ export async function exportAllToZip(
           name: a.name,
           tags: a.tags,
         })),
-      }, null, 2)),
+      }, null, 2),
       { name: 'manifest.json' }
     );
 
@@ -74,8 +75,8 @@ export async function exportAllToZip(
 
         // JSON元数据文件
         const jsonFileName = `${asset.type}s/${asset.name}.json`;
-        archive.file(
-          Buffer.from(JSON.stringify(data, null, 2)),
+        archive.append(
+          JSON.stringify(data, null, 2),
           { name: jsonFileName }
         );
 
@@ -83,7 +84,7 @@ export async function exportAllToZip(
         if (options.includeContent !== false) {
           const ext = asset.type === 'mcp' || asset.type === 'workflow' || asset.type === 'agent' ? '.yaml' : '.md';
           const contentFileName = `${asset.type}s/${asset.name}${ext}`;
-          archive.file(Buffer.from(content), { name: contentFileName });
+          archive.append(content, { name: contentFileName });
         }
 
         count++;

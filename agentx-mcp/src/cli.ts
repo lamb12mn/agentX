@@ -28,27 +28,36 @@ import { registerRemoteAdd } from "./cli/commands/remote/add.js";
 import { registerRestoreCommand } from "./cli/commands/restore.js";
 
 const program = new Command();
-registerDoctorCommand(program);
-registerGraphCommand(program);
-    registerProxyCommand(program);
-    registerInitCommand(program);
-    registerAuditCommand(program);
-    registerBackupCommand(program);
-    registerRestoreCommand(program);
-    registerRemoteAdd(program);
-    registerRemoteList(program);
-    registerRemoteRemove(program);
-    registerPull(program);
-    registerPush(program);
-    registerMcpSend(program);
-    registerMcpInspect(program);
-
 
 program
   .name('agentx')
   .description('AgentX CLI — manage your local agent asset library')
-  .version('1.0.0');
+  .version('1.0.0')
+  .configureHelp({
+    sortSubcommands: true,
+  });
 
+// Diagnostic & utility commands
+registerDoctorCommand(program);
+registerGraphCommand(program);
+registerProxyCommand(program);
+registerInitCommand(program);
+registerAuditCommand(program);
+registerBackupCommand(program);
+registerRestoreCommand(program);
+
+// Remote sync commands
+registerRemoteAdd(program);
+registerRemoteList(program);
+registerRemoteRemove(program);
+registerPull(program);
+registerPush(program);
+
+// MCP tool commands
+registerMcpSend(program);
+registerMcpInspect(program);
+
+// Asset management commands
 registerListCommand(program);
 registerSearchCommand(program);
 registerInfoCommand(program);
@@ -62,13 +71,15 @@ registerCreateCommand(program);
 registerTemplateCommand(program);
 registerValidateCommand(program);
 
-program.parse();
+// Web dashboard
 program
-    .command('web')
-    .description('Start web dashboard')
-    .action(() => {
-        import('./web/server.js').catch(err => {
-            console.error('Failed to start web server:', err);
-            process.exit(1);
-        });
+  .command('web')
+  .description('Start web dashboard')
+  .action(() => {
+    import('./web/server.js').catch(err => {
+      console.error('Failed to start web server:', err);
+      process.exit(1);
     });
+  });
+
+program.parse();

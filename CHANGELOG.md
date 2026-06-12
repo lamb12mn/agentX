@@ -7,6 +7,28 @@
 
 ---
 
+## [2.0.0] - 2026-06-12
+
+### 修复 🔧
+
+- **REST API 认证** — 新增 `addAuthMiddleware()` 启用 API 密钥认证
+- **CloudSync 深度修复** — `getPendingUploads()` 连接真实 SQLite 查询；`applyRemoteChange()` 实现本地数据库 upsert；新增 `sync_tracking` 表；上传后自动标记同步状态
+- **双入口点合并** — `index.ts` 与 `index-enhanced.ts` 统一，通过 `AGENTX_ENHANCED` 环境变量切换
+- **SQLite WAL 模式** — 初始化时启用 WAL，提升并发性能
+- **依赖分类修复** — `express`、`axios` 移入 `dependencies`
+- **CLI 格式化** — 修复缩进不一致，命令按组排序
+- **中间件错误传播** — `handleRequest()` 支持公开路径绕过认证
+
+### 新增 ✨
+
+- **GitHub Actions CI** — `.github/workflows/ci.yml`，Node 18/20/22 矩阵构建，自动 tsc 检查和测试
+- **`.gitignore`** — 忽略自动生成产物（`.codegraph`、`autoresearch/` 等）
+
+### 变更 ⚡
+
+- 版本统一为 `2.0.0`
+- CLI 帮助输出按组排序
+
 ## [1.0.0] - 2026-04-29
 
 ### 新增 ✨

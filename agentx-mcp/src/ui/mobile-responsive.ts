@@ -31,6 +31,29 @@ export interface ComponentStyle {
 }
 
 export class MobileResponsiveUI {
+  private listeners: Map<string, Array<(...args: any[]) => void>> = new Map();
+
+  private emit(event: string, ...args: any[]): void {
+    const handlers = this.listeners.get(event);
+    if (handlers) {
+      handlers.forEach(handler => handler(...args));
+    }
+  }
+
+  on(event: string, handler: (...args: any[]) => void): void {
+    if (!this.listeners.has(event)) {
+      this.listeners.set(event, []);
+    }
+    this.listeners.get(event)!.push(handler);
+  }
+
+  off(event: string, handler: (...args: any[]) => void): void {
+    const handlers = this.listeners.get(event);
+    if (handlers) {
+      const idx = handlers.indexOf(handler);
+      if (idx >= 0) handlers.splice(idx, 1);
+    }
+  }
   private config: ResponsiveConfig;
   private components: Map<string, UIComponent>;
   private currentBreakpoint: string;

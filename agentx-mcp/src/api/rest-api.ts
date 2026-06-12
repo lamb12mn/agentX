@@ -338,14 +338,28 @@ export class RESTAPI extends EventEmitter {
 
   /**
    * 添加身份验证中间件
+   * @param apiKey 预期的 API key（Bearer token）
+   * @param publicPaths 不需要认证的路径前缀列表
    */
-  addAuthMiddleware(apiKey: string): void {
+  addAuthMiddleware(apiKey: string, publicPaths: string[] = ['/health']): void {
     this.use((req, res, next) => {
+      // 公开路径跳过认证
+      if (publicPaths.some(p => req.path.startsWith(p))) {
+        next();
+        return;
+      }
       const authHeader = req.headers['authorization'];
       if (!authHeader || authHeader !== `Bearer ${apiKey}`) {
         throw new Error('Unauthorized');
       }
       next();
     });
+  }
+
+  /**
+   * 获取认证状态
+   */
+  isAuthEnabled(): boolean {
+    return this.middlewares.length > 0;
   }
 }

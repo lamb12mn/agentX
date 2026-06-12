@@ -476,14 +476,10 @@ export async function* streamAssetsEnhanced(type?: AssetType, batchSize: number 
 
 // 导出所有函数
 export {
-  cloneAsset,
-  detectCircularDependencies,
-  createDependency as createDependency,
   removeDependenciesForAsset as deleteDependency,
   isAssetUsed,
   getDependents,
   getDependencies,
-  indexAssetContent,
 } from './dependencies.js';
 
 // 同步文件操作

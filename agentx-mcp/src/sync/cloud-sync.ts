@@ -1,4 +1,5 @@
 import { EventEmitter } from 'events';
+import { getDb } from '../store/db.js';
 import type { AssetMeta } from '../types.js';
 
 export interface SyncConfig {
@@ -215,15 +216,55 @@ export class CloudSyncService extends EventEmitter {
     if (!response.ok) {
       throw new Error(`Upload failed: ${response.statusText}`);
     }
+
+    // 上传成功后标记已同步
+    this.markAsSynced(asset.id);
+  }
+
+  /**
+   * 标记资产已同步
+   */
+  private markAsSynced(assetId: string): void {
+    try {
+      const db = getDb();
+      db.prepare(
+        `INSERT OR REPLACE INTO sync_tracking (asset_id, sync_status, last_synced_at)
+         VALUES (?, 'synced', ?)`
+      ).run(assetId, Date.now());
+    } catch (error) {
+      // 标记失败不影响主流程，仅记录
+      this.emit('syncError', `markAsSynced failed for ${assetId}: ${error}`);
+    }
   }
 
   /**
    * 获取待上传的资产
    */
   private async getPendingUploads(): Promise<AssetMeta[]> {
-    // 这里应该查询本地数据库获取待上传的资产
-    // 简化实现：返回空数组
-    return [];
+    try {
+      const db = getDb();
+      const rows = db.prepare(
+        `SELECT a.* FROM assets a
+         LEFT JOIN sync_tracking s ON s.asset_id = a.id
+         WHERE s.asset_id IS NULL OR s.sync_status = 'pending'`
+      ).all() as Record<string, unknown>[];
+      return rows.map(r => this.rowToMeta(r));
+    } catch {
+      return [];
+    }
+  }
+
+  private rowToMeta(row: Record<string, unknown>): AssetMeta {
+    return {
+      id: row.id as string,
+      type: row.type as AssetMeta['type'],
+      name: row.name as string,
+      description: row.description as string | undefined,
+      tags: JSON.parse(row.tags as string) as string[],
+      file_path: row.file_path as string,
+      created_at: row.created_at as number,
+      updated_at: row.updated_at as number,
+    };
   }
 
   /**
@@ -248,7 +289,7 @@ export class CloudSyncService extends EventEmitter {
   }
 
   /**
-   * 应用远程更改
+   * 应用远程更改（写入本地数据库）
    */
   private async applyRemoteChange(change: AssetMeta): Promise<boolean> {
     // 检查是否有冲突
@@ -259,8 +300,41 @@ export class CloudSyncService extends EventEmitter {
       return true;
     }
 
-    // 应用更改
-    this.emit('changeApplied', change);
+    // 写入本地数据库（upsert）
+    try {
+      const db = getDb();
+      const existing = db.prepare('SELECT id, updated_at FROM assets WHERE id = ?').get(change.id) as
+        { id: string; updated_at: number } | undefined;
+
+      if (existing) {
+        // 远程版本更新 → 更新本地
+        db.prepare(`
+          UPDATE assets SET type = ?, name = ?, description = ?, tags = ?,
+            file_path = ?, updated_at = ?
+          WHERE id = ?
+        `).run(change.type, change.name, change.description ?? null, JSON.stringify(change.tags ?? []),
+          change.file_path, change.updated_at, change.id);
+      } else {
+        // 远程新增 → 插入本地
+        db.prepare(`
+          INSERT INTO assets (id, type, name, description, tags, file_path, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(change.id, change.type, change.name, change.description ?? null,
+          JSON.stringify(change.tags ?? []), change.file_path, change.created_at, change.updated_at);
+      }
+
+      // 标记同步状态
+      db.prepare(
+        `INSERT OR REPLACE INTO sync_tracking (asset_id, sync_status, last_synced_at)
+         VALUES (?, 'synced', ?)`
+      ).run(change.id, Date.now());
+
+      this.emit('changeApplied', change);
+    } catch (error) {
+      this.emit('syncError', `applyRemoteChange failed for ${change.id}: ${error}`);
+      throw error;
+    }
+
     return false;
   }
 
@@ -268,7 +342,7 @@ export class CloudSyncService extends EventEmitter {
    * 检查冲突
    */
   private async checkConflict(change: AssetMeta): Promise<boolean> {
-    // 简化实现：检查本地是否有更新的版本
+    // 查询本地是否有更新的版本
     const localVersion = await this.getLocalVersion(change.id);
     return localVersion ? localVersion.updated_at > change.updated_at : false;
   }
@@ -277,15 +351,34 @@ export class CloudSyncService extends EventEmitter {
    * 获取本地版本
    */
   private async getLocalVersion(id: string): Promise<AssetMeta | null> {
-    // 这里应该查询本地数据库
-    // 简化实现：返回null
-    return null;
+    try {
+      const db = getDb();
+      const row = db.prepare('SELECT * FROM assets WHERE id = ?').get(id) as Record<string, unknown> | undefined;
+      return row ? this.rowToMeta(row) : null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * 更新 totalAssets 为本地真实数量
+   */
+  private updateTotalAssets(): void {
+    try {
+      const db = getDb();
+      const row = db.prepare('SELECT COUNT(*) AS cnt FROM assets').get() as { cnt: number };
+      this.status.totalAssets = row.cnt;
+    } catch {
+      // 静默失败，保留旧值
+    }
   }
 
   /**
    * 获取同步状态
    */
   getStatus(): SyncStatus {
+    // 每次获取时刷新资产总数
+    this.updateTotalAssets();
     return { ...this.status };
   }
 

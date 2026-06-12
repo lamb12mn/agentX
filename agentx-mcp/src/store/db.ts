@@ -7,6 +7,7 @@ let db: Database.Database | undefined;
 export function initDb(dbPath: string): void {
   mkdirSync(dirname(dbPath), { recursive: true });
   db = new Database(dbPath);
+  db.pragma('journal_mode = WAL');
   db.exec(`
     CREATE TABLE IF NOT EXISTS assets (
       id TEXT PRIMARY KEY,
@@ -58,6 +59,16 @@ export function initDb(dbPath: string): void {
       error_message TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
+
+    -- 同步追踪表：记录资产同步状态
+    CREATE TABLE IF NOT EXISTS sync_tracking (
+      asset_id TEXT PRIMARY KEY,
+      sync_status TEXT DEFAULT 'pending',
+      last_synced_at INTEGER,
+      remote_version INTEGER,
+      FOREIGN KEY (asset_id) REFERENCES assets(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_sync_tracking_status ON sync_tracking(sync_status);
 
     CREATE VIRTUAL TABLE IF NOT EXISTS assets_fts USING fts5(
       id UNINDEXED,
