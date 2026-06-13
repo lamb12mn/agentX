@@ -3,7 +3,6 @@ import { createAsset } from '../../store/assets.js';
 import type { AssetType } from '../../types.js';
 import chalk from 'chalk';
 import { input, editor, confirm } from '@inquirer/prompts';
-import yaml from 'js-yaml';
 import { getBaseDir, withDb } from '../common.js';
 
 const VALID_TYPES: AssetType[] = ['skill', 'prompt', 'rule', 'mcp', 'workflow', 'agent'];
@@ -33,7 +32,7 @@ export function registerCreateCommand(program: Command): void {
     .action(withDb(async (options: CreateOptions) => {
       const baseDir = getBaseDir();
 
-      const { type, name, content, description, tags, interactive } = options;
+      let { type, name, content, description, tags, interactive } = options;
 
       // Validate type
       if (!VALID_TYPES.includes(type as AssetType)) {
@@ -54,10 +53,11 @@ export function registerCreateCommand(program: Command): void {
         });
 
         if (useInteractive) {
-          const assetTypeAnswer = await input({
+          const answer = await input({
             message: 'Select asset type:',
             default: type,
           });
+          type = answer as AssetType;
           finalName = await input({
             message: 'Enter asset name:',
             default: finalName,
@@ -141,5 +141,5 @@ export function registerCreateCommand(program: Command): void {
         console.error(chalk.red('Failed to create asset:'), err instanceof Error ? err.message : err);
         process.exit(1);
       }
-    });
+    }));
 }

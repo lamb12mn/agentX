@@ -6,9 +6,7 @@ import { getDb } from './db.js';
 import { indexAssetContent } from './search.js';
 import {
   removeDependenciesForAsset,
-  getDependents as getDependentsFromDeps,
   getDependencies as getDependenciesFromDeps,
-  detectCircularDependency as detectCircularFromDeps,
   addDependency,
 } from './dependencies.js';
 import type { AssetMeta, AssetType } from '../types.js';
@@ -29,7 +27,7 @@ interface UpdateAssetInput {
 }
 
 function fileExtension(type: AssetType): string {
-  if (type === 'mcp' || type === 'workflow' || type === 'agent') return '.yaml';
+  if (type === 'mcp' || type === 'workflow' || type === 'agent' || type === 'team') return '.yaml';
   return '.md';
 }
 
@@ -413,8 +411,16 @@ export async function batchRemoveTags(
   return result;
 }
 
-// 导出依赖管理函数
-export { addDependency as createDependency, removeDependenciesForAsset as deleteDependency, isAssetUsed } from './dependencies.js';
+// 导出依赖管理函数（作为显式包装器，避免 ESM 重导出别名可能导致的 vitest 模块解析问题）
+export function createDependency(assetId: string, dependsOnId: string): void {
+  addDependency(assetId, dependsOnId);
+}
+
+export function deleteDependency(assetId: string): void {
+  removeDependenciesForAsset(assetId);
+}
+
+export { isAssetUsed } from './dependencies.js';
 export { getDependents as getDependents, getDependencies as getDependencies } from './dependencies.js';
 // 重新导出搜索函数供其他模块使用
 export { indexAssetContent } from './search.js';
@@ -423,7 +429,6 @@ export { indexAssetContent } from './search.js';
  * 检测循环依赖并返回循环路径
  */
 export function detectCircularDependencies(assetId: string): string[] {
-  const db = getDb();
   const visited = new Set<string>();
   const stack: string[] = [];
   const cycle: string[] = [];
@@ -499,6 +504,14 @@ export async function cloneAsset(
   for (const depId of deps) {
     addDependency(newAsset.id, depId);
   }
+
+  logAudit({
+    timestamp: new Date().toISOString(),
+    action: 'CLONE_ASSET',
+    userId: 'system',
+    assetId: newAsset.id,
+    details: { sourceId, sourceName: sourceAsset.name, newName: clonedName },
+  });
 
   return newAsset;
 }

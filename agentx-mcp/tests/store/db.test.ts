@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { initDb, getDb, closeDb } from '../../src/store/db';
+import { initDb, getDb, closeDb } from '../../src/store/db.js';
 import { mkdtempSync, rmSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';

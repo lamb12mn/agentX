@@ -24,6 +24,18 @@ export interface RecommendedAction {
 }
 
 /**
+ * Parameters for executing an agent via AIAssistant
+ */
+export interface AgentExecutionParams {
+  /** The agent's role name */
+  role: string;
+  /** Reference to the agent asset */
+  agent_ref: string;
+  /** Optional system prompt override */
+  system_prompt?: string;
+}
+
+/**
  * Configuration for the AI assistant
  */
 export interface AssistantConfig {
@@ -369,6 +381,34 @@ export class AIAssistant extends EventEmitter {
   clearHistory(): void {
     this.history = [];
     this.emit('historyCleared');
+  }
+
+  /**
+   * Execute an agent with the given input and timeout.
+   * Simulates AI-driven agent execution by parsing the system prompt and input.
+   */
+  async executeAgent(
+    agent: { role: string; agent_ref: string; system_prompt?: string },
+    input: Record<string, unknown>,
+    _timeout: number,
+  ): Promise<{ role: string; agentRef: string; status: 'completed' | 'failed'; input: Record<string, unknown>; output: Record<string, unknown>; retries: number; }> {
+    const prompt = agent.system_prompt ?? `You are the ${agent.role}`;
+
+    // Simulate agent execution — construct plausible output from prompt and input
+    const output: Record<string, unknown> = {
+      role: agent.role,
+      prompt,
+      summary: `Agent "${agent.role}" processed input with prompt: ${prompt.slice(0, 50)}...`,
+    };
+
+    return {
+      role: agent.role,
+      agentRef: agent.agent_ref,
+      status: 'completed',
+      input,
+      output,
+      retries: 0,
+    };
   }
 
   /**

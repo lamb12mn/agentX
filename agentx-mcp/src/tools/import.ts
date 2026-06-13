@@ -2,6 +2,7 @@ import { readFile, readdir, stat } from 'fs/promises';
 import { join, basename, extname } from 'path';
 import { homedir } from 'os';
 import { createAsset, listAssets } from '../store/assets.js';
+import { logAudit } from '../audit/index.js';
 import type { AssetMeta, AssetType, ImportResult } from '../types.js';
 
 export type { ImportResult };
@@ -120,6 +121,13 @@ export function registerImportTools(baseDir: string): ImportTools {
             result.errors.push(`Failed to import ${filePath}: ${String(err)}`);
           }
         }
+
+        logAudit({
+          timestamp: new Date().toISOString(),
+          action: 'IMPORT_ASSET',
+          userId: 'system',
+          details: { type, count: result.imported.length, skipped: result.skipped.length },
+        });
 
         return result;
       },

@@ -1,5 +1,5 @@
 /** 支持的资产类型 */
-export type AssetType = 'skill' | 'mcp' | 'prompt' | 'rule' | 'workflow' | 'agent';
+export type AssetType = 'skill' | 'mcp' | 'prompt' | 'rule' | 'workflow' | 'agent' | 'team';
 
 /** 资产元数据 */
 export interface AssetMeta {
@@ -53,6 +53,76 @@ export interface McpConfig {
   env?: Record<string, string>;
   /** 是否启用 */
   enabled: boolean;
+}
+
+/** 团队配置 — 多智能体编排定义 */
+export interface TeamConfig {
+  /** 团队名称 */
+  name: string;
+  /** 版本号 */
+  version: string;
+  /** 可选描述 */
+  description?: string;
+  /** 团队成员 */
+  agents: TeamAgent[];
+  /** 执行流程步骤 (from→to pipeline) */
+  workflow: TeamWorkflowStep[];
+  /** 输入/输出变量映射 */
+  variables?: TeamVariable[];
+  /** 重试策略 */
+  retry?: { maxRetries: number; backoffMs: number };
+  /** 超时 (ms) */
+  timeout?: number;
+  /** 执行完成后的 webhook 回调 */
+  webhook?: TeamWebhook;
+}
+
+/** Webhook 回调配置 */
+export interface TeamWebhook {
+  /** 回调 URL */
+  url: string;
+  /** 触发事件列表 */
+  events: ('start' | 'step.complete' | 'step.failed' | 'complete' | 'all')[];
+  /** 可选自定义请求头 */
+  headers?: Record<string, string>;
+}
+
+/** 团队成员定义 */
+export interface TeamAgent {
+  /** 角色名称 (如 researcher, writer) */
+  role: string;
+  /** 引用的 Agent 资产 ID 或名称 */
+  agent_ref: string;
+  /** 可选的角色覆写提示词 */
+  system_prompt?: string;
+  /** 是否必须 (失败则整个团队执行失败) */
+  required?: boolean;
+  /** 代理类型: 'ai' (默认) 或 'human' (需人工审批) */
+  agent_type?: 'ai' | 'human';
+  /** 人工审批超时 (ms)，默认 300_000 (5分钟) */
+  approval_timeout?: number;
+}
+
+/** 团队工作流步骤 */
+export interface TeamWorkflowStep {
+  /** 输入角色 */
+  from: string;
+  /** 输出角色 */
+  to: string;
+  /** 可选条件 (如 "output.confidence >= 0.8") */
+  condition?: string;
+  /** 输入上下文模板 ({{variable}} 格式) */
+  input_template?: string;
+  /** 嵌套子团队配置 (递归执行) */
+  sub_team?: TeamConfig;
+}
+
+/** 变量映射 */
+export interface TeamVariable {
+  name: string;
+  source: 'input' | 'step_output';
+  step_role?: string;
+  field?: string;
 }
 
 /** 搜索结果条目 */

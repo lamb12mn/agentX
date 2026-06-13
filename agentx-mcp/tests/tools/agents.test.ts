@@ -2,8 +2,8 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, rmSync, existsSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
-import { initDb, closeDb } from '../../src/store/db';
-import { registerAgentTools } from '../../src/tools/agents';
+import { initDb, closeDb } from '../../src/store/db.js';
+import { registerAgentTools } from '../../src/tools/agents.js';
 import type { AgentConfig } from '../../src/types';
 
 const sampleConfig: AgentConfig = {

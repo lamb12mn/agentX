@@ -1,6 +1,7 @@
 import { getAsset, readAssetContent, listAssets } from '../store/assets.js';
 import { exportAgent } from '../export/claude.js';
 import { exportAsZip, exportAsJson, exportAsYaml } from '../utils/zip.js';
+import { logAudit } from '../audit/index.js';
 import type { AgentConfig, AssetType } from '../types.js';
 import yaml from 'js-yaml';
 import { createError, ErrorCode } from '../utils/errors.js';
@@ -57,6 +58,15 @@ export function registerExportTools(baseDir: string) {
         }
 
         const result = await exportAgent(config, output_dir);
+
+        logAudit({
+          timestamp: new Date().toISOString(),
+          action: 'EXPORT_ASSET',
+          userId: 'system',
+          assetId: id,
+          details: { output_dir, agentName: asset.name },
+        });
+
         return {
           success: true,
           claude_md: result.claude_md_path,
@@ -115,6 +125,13 @@ export function registerExportTools(baseDir: string) {
             results.push(asset.name);
           }
 
+          logAudit({
+            timestamp: new Date().toISOString(),
+            action: 'EXPORT_ASSET',
+            userId: 'system',
+            details: { format: 'claude', count: assets.length },
+          });
+
           return {
             success: true,
             message: `Exported ${assets.length} agents`,
@@ -136,6 +153,13 @@ export function registerExportTools(baseDir: string) {
           } else {
             throw createError('INVALID_INPUT', { details: `Unknown format: ${format}` });
           }
+
+          logAudit({
+            timestamp: new Date().toISOString(),
+            action: 'EXPORT_ASSET',
+            userId: 'system',
+            details: { format, output: resultPath },
+          });
 
           return {
             success: true,

@@ -2,8 +2,8 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, rmSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
-import { initDb, closeDb } from '../../src/store/db';
-import { registerSkillTools } from '../../src/tools/skills';
+import { initDb, closeDb } from '../../src/store/db.js';
+import { registerSkillTools } from '../../src/tools/skills.js';
 
 describe('skill tools', () => {
   let tmpDir: string;

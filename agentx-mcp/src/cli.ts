@@ -26,6 +26,8 @@ import { registerRemoteRemove } from "./cli/commands/remote/remove.js";
 import { registerRemoteList } from "./cli/commands/remote/list.js";
 import { registerRemoteAdd } from "./cli/commands/remote/add.js";
 import { registerRestoreCommand } from "./cli/commands/restore.js";
+import { registerVaultCommand } from "./cli/commands/vault.js";
+import { registerTeamCommand } from "./cli/commands/team.js";
 
 const program = new Command();
 
@@ -75,6 +77,12 @@ registerImportCommand(program);
 registerCreateCommand(program);
 registerTemplateCommand(program);
 registerValidateCommand(program);
+
+// Vault commands
+registerVaultCommand(program);
+
+// Team orchestration commands
+registerTeamCommand(program);
 
 // Web dashboard
 program

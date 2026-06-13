@@ -1,6 +1,8 @@
 import { EventEmitter } from 'events';
-import type { AssetMeta, AssetType } from '../types.js';
-import type { PaginatedResult } from '../types/pagination.js';
+
+import { listAssets, getAsset, createAsset, updateAsset, deleteAsset, batchDeleteAssets, batchAddTags, batchRemoveTags } from '../store/assets.js';
+import { getStats } from '../store/pagination.js';
+import { getBaseDir } from '../cli/common.js';
 
 /** REST API 服务器配置 */
 export interface APIConfig {
@@ -144,7 +146,7 @@ export class RESTAPI extends EventEmitter {
 
     // 执行中间件
     for (const middleware of this.middlewares) {
-      await new Promise<void>((resolve, reject) => {
+      await new Promise<void>((resolve, _reject) => {
         middleware(req, {} as APIResponse, () => resolve());
       });
     }
@@ -229,86 +231,92 @@ export class RESTAPI extends EventEmitter {
 
     // 资产相关路由
     this.registerRoute('GET', '/api/assets', async (req: any) => {
-      // 这里应该调用实际的资产列表函数
-      return { assets: [], total: 0 };
+      const assets = await listAssets(req.query?.type);
+      return { assets, total: assets.length };
     });
 
     this.registerRoute('GET', '/api/assets/:id', async (req: any) => {
-      // 这里应该调用实际的资产获取函数
-      return { asset: null };
+      const id = req.path.split('/').pop();
+      const asset = await getAsset(id);
+      return { asset };
     });
 
     this.registerRoute('POST', '/api/assets', async (req: any) => {
-      // 这里应该调用实际的资产创建函数
-      return { asset: null };
+      const baseDir = getBaseDir();
+      const { body } = req;
+      const input = { name: body.name, type: body.type, description: body.description, tags: body.tags ?? [] };
+      const asset = await createAsset(input, body.content ?? '', baseDir);
+      return { asset };
     });
 
     this.registerRoute('PUT', '/api/assets/:id', async (req: any) => {
-      // 这里应该调用实际的资产更新函数
-      return { asset: null };
+      const id = req.path.split('/').pop();
+      const asset = await updateAsset(id, req.body);
+      return { asset };
     });
 
     this.registerRoute('DELETE', '/api/assets/:id', async (req: any) => {
-      // 这里应该调用实际的资产删除函数
+      const id = req.path.split('/').pop();
+      await deleteAsset(id);
       return { success: true };
     });
 
     // 分页查询
     this.registerRoute('GET', '/api/assets/paginated', async (req: any) => {
-      // 这里应该调用实际的分页查询函数
+      const all = await listAssets(req.query?.type);
+      const page = parseInt(req.query?.page ?? '1', 10);
+      const pageSize = parseInt(req.query?.pageSize ?? '20', 10);
+      const start = (page - 1) * pageSize;
+      const data = all.slice(start, start + pageSize);
+      const total = all.length;
       return {
-        data: [],
+        data,
         pagination: {
-          page: 1,
-          pageSize: 20,
-          total: 0,
-          totalPages: 0,
-          hasNextPage: false,
-          hasPrevPage: false,
+          page,
+          pageSize,
+          total,
+          totalPages: Math.ceil(total / pageSize),
+          hasNextPage: start + pageSize < total,
+          hasPrevPage: page > 1,
         },
       };
     });
 
     // 批量操作
     this.registerRoute('POST', '/api/assets/batch/delete', async (req: any) => {
-      // 这里应该调用实际的批量删除函数
-      return { deleted: [], blocked: [], errors: [] };
+      const result = await batchDeleteAssets(req.body.ids ?? [], { force: req.body.force });
+      return result;
     });
 
     this.registerRoute('POST', '/api/assets/batch/tags/add', async (req: any) => {
-      // 这里应该调用实际的批量添加标签函数
-      return { updated: [], errors: [] };
+      const result = await batchAddTags(req.body.ids ?? [], req.body.tags ?? []);
+      return result;
     });
 
     this.registerRoute('POST', '/api/assets/batch/tags/remove', async (req: any) => {
-      // 这里应该调用实际的批量移除标签函数
-      return { updated: [], errors: [] };
+      const result = await batchRemoveTags(req.body.ids ?? [], req.body.tags ?? []);
+      return result;
     });
 
     // 工作流相关路由
     this.registerRoute('GET', '/api/workflows', async () => {
-      return { workflows: [] };
+      const workflows = await listAssets('workflow');
+      return { workflows };
     });
 
     this.registerRoute('POST', '/api/workflows/execute', async (req: any) => {
-      return { execution: null };
+      return { execution: { id: req.body?.workflowId, status: 'pending', message: 'Execution not yet implemented' } };
     });
 
     // 统计信息
     this.registerRoute('GET', '/api/stats', async () => {
-      return {
-        totalAssets: 0,
-        assetsByType: {},
-        recentActivity: 0,
-      };
+      const stats = await getStats();
+      return stats;
     });
 
     // 缓存统计
     this.registerRoute('GET', '/api/cache/stats', async () => {
-      return {
-        hitRate: 0,
-        size: 0,
-      };
+      return { hitRate: 0, size: 0, message: 'Cache stats available in enhanced mode only' };
     });
   }
 
@@ -347,7 +355,7 @@ export class RESTAPI extends EventEmitter {
    * 添加CORS中间件
    */
   addCorsMiddleware(): void {
-    this.use((req, res, next) => {
+    this.use((_req, _res, next) => {
       // 在实际实现中，这里会设置CORS头
       next();
     });
@@ -357,8 +365,7 @@ export class RESTAPI extends EventEmitter {
    * 添加日志中间件
    */
   addLoggingMiddleware(): void {
-    this.use((req, res, next) => {
-      const start = Date.now();
+    this.use((req, _res, next) => {
       console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
       next();
     });
@@ -370,7 +377,7 @@ export class RESTAPI extends EventEmitter {
    * @param publicPaths 不需要认证的路径前缀列表
    */
   addAuthMiddleware(apiKey: string, publicPaths: string[] = ['/health']): void {
-    this.use((req, res, next) => {
+    this.use((req, _res, next) => {
       // 公开路径跳过认证
       if (publicPaths.some(p => req.path.startsWith(p))) {
         next();

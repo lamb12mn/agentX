@@ -3,7 +3,7 @@
  * Provides preset templates for creating new assets
  */
 
-import type { AssetType, AgentConfig, McpConfig } from '../types.js';
+import type { AssetType } from '../types.js';
 
 /**
  * Template definition for creating new assets
@@ -242,6 +242,56 @@ export const ruleTemplates: Template[] = [
 ];
 
 /**
+ * Predefined team templates
+ */
+export const teamTemplates: Template[] = [
+  {
+    id: 'team-research-review',
+    name: 'Research & Review Team',
+    description: 'Three-agent pipeline: researcher → writer → reviewer',
+    type: 'team',
+    content: JSON.stringify({
+      name: 'research-review',
+      version: '1.0.0',
+      description: 'A team that researches a topic, writes a report, and reviews it for quality.',
+      agents: [
+        { role: 'researcher', agent_ref: 'researcher-agent', required: true },
+        { role: 'writer', agent_ref: 'writer-agent', required: true },
+        { role: 'reviewer', agent_ref: 'reviewer-agent', required: false },
+      ],
+      workflow: [
+        { from: 'researcher', to: 'writer' },
+        { from: 'writer', to: 'reviewer' },
+      ],
+      retry: { maxRetries: 1, backoffMs: 1000 },
+      timeout: 60000,
+    }, null, 2),
+    tags: ['template', 'team', 'research'],
+  },
+  {
+    id: 'team-code-review',
+    name: 'Code Review Team',
+    description: 'Two-agent pipeline: coder → reviewer',
+    type: 'team',
+    content: JSON.stringify({
+      name: 'code-review',
+      version: '1.0.0',
+      description: 'A team that writes code and reviews it for quality and security.',
+      agents: [
+        { role: 'coder', agent_ref: 'developer-agent', required: true },
+        { role: 'reviewer', agent_ref: 'reviewer-agent', required: true },
+      ],
+      workflow: [
+        { from: 'coder', to: 'reviewer' },
+      ],
+      retry: { maxRetries: 1, backoffMs: 1000 },
+      timeout: 30000,
+    }, null, 2),
+    tags: ['template', 'team', 'code'],
+  },
+];
+
+/**
  * Predefined workflow templates
  */
 export const workflowTemplates: Template[] = [
@@ -278,6 +328,7 @@ export function getTemplatesByType(type: AssetType): Template[] {
     case 'prompt': return promptTemplates;
     case 'rule': return ruleTemplates;
     case 'workflow': return workflowTemplates;
+    case 'team': return teamTemplates;
     default: return [];
   }
 }
@@ -288,7 +339,7 @@ export function getTemplatesByType(type: AssetType): Template[] {
  * @returns The matching template, or undefined if not found
  */
 export function getTemplate(id: string): Template | undefined {
-  const all = [...skillTemplates, ...agentTemplates, ...mcpTemplates, ...promptTemplates, ...ruleTemplates, ...workflowTemplates];
+  const all = [...skillTemplates, ...agentTemplates, ...mcpTemplates, ...promptTemplates, ...ruleTemplates, ...workflowTemplates, ...teamTemplates];
   return all.find(t => t.id === id);
 }
 
@@ -304,5 +355,6 @@ export function listTemplates(): Template[] {
     ...promptTemplates,
     ...ruleTemplates,
     ...workflowTemplates,
+    ...teamTemplates,
   ];
 }

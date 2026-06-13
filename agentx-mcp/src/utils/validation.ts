@@ -86,7 +86,7 @@ export function validateCreateAssetInput(input: {
   }
 
   // Validate content (required for most types)
-  if (!input.content && input.type !== 'agent' && input.type !== 'mcp') {
+  if (!input.content && input.type !== 'agent' && input.type !== 'mcp' && input.type !== 'team') {
     errors.push({
       field: 'content',
       code: 'MISSING_REQUIRED_FIELD',

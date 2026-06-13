@@ -1,7 +1,7 @@
 import type { Command } from 'commander';
 import { getAsset, readAssetContent, listAssets } from '../../store/assets.js';
 import { exportAgent } from '../../export/claude.js';
-import type { AgentConfig, AssetType } from '../../types.js';
+import type { AgentConfig } from '../../types.js';
 import yaml from 'js-yaml';
 import chalk from 'chalk';
 import { exportAsZip, exportAsJson, exportAsYaml } from '../../utils/zip.js';
@@ -52,7 +52,6 @@ export function registerExportCommand(program: Command): void {
       const baseDir = getBaseDir();
 
       const format = opts.format as 'claude' | 'zip' | 'json' | 'yaml';
-      const type = opts.type as AssetType | undefined;
 
       // claude格式仅支持单个agent导出，这里导出所有agents
       if (format === 'claude') {

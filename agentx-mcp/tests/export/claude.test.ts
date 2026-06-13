@@ -2,8 +2,8 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, rmSync, readFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
-import { exportAgent } from '../../src/export/claude';
-import type { AgentConfig } from '../../src/types';
+import { exportAgent } from '../../src/export/claude.js';
+import type { AgentConfig } from '../../src/types.js';
 
 describe('exportAgent', () => {
   let tmpDir: string;

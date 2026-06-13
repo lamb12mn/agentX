@@ -4,7 +4,7 @@ import { confirm } from '@inquirer/prompts';
 import chalk from 'chalk';
 import type { AssetType } from '../../types.js';
 import { checkDeleteSafety } from '../../store/dependencies.js';
-import { getBaseDir, withDb } from '../common.js';
+import { withDb } from '../common.js';
 
 const VALID_TYPES: AssetType[] = ['skill', 'prompt', 'rule', 'mcp', 'workflow', 'agent'];
 
@@ -18,8 +18,6 @@ export function registerDeleteCommand(program: Command): void {
     .option('-y, --yes', 'Skip confirmation prompt')
     .option('-t, --type <type>', `Delete all assets of type: ${VALID_TYPES.join('|')}`)
     .action(withDb(async (ids: string[] | undefined, options?: { yes?: boolean; type?: string }) => {
-      const baseDir = getBaseDir();
-
       const idsToDelete: string[] = [];
       const assetsToDelete: Array<{ id: string; name: string; type: AssetType }> = [];
 

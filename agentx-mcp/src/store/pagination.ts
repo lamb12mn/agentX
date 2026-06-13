@@ -191,6 +191,7 @@ export async function getStats(): Promise<{
     mcp: 0,
     workflow: 0,
     agent: 0,
+    team: 0,
   };
   
   for (const result of typeResults) {

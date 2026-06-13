@@ -86,8 +86,7 @@ const errorMessages: Record<ErrorCodeType, { message: string; suggestion: string
     suggestion: 'Use only letters, numbers, underscores, and hyphens',
   },
   [ErrorCode.ASSET_INVALID_TYPE]: {
-    message: 'Invalid asset type specified',
-    suggestion: 'Valid types: skill, agent, prompt, rule, mcp, workflow',
+    message: 'Invalid asset type specified',      suggestion: 'Valid types: skill, agent, prompt, rule, mcp, workflow, team',
   },
   [ErrorCode.ASSET_CREATE_FAILED]: {
     message: 'Failed to create the asset',
@@ -296,6 +295,6 @@ export function validateAssetName(name: string): { valid: boolean; error?: strin
  * Validates asset type
  */
 export function validateAssetType(type: unknown): type is AssetType {
-  const validTypes: AssetType[] = ['skill', 'agent', 'prompt', 'rule', 'mcp', 'workflow'];
+  const validTypes: AssetType[] = ['skill', 'agent', 'prompt', 'rule', 'mcp', 'workflow', 'team'];
   return validTypes.includes(type as AssetType);
 }

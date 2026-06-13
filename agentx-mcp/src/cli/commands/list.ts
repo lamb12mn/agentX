@@ -3,7 +3,7 @@ import { listAssets } from '../../store/assets.js';
 import { formatAssets } from '../format.js';
 import type { AssetType } from '../../types.js';
 import chalk from 'chalk';
-import { getDbPath, withDb } from '../common.js';
+import { withDb } from '../common.js';
 
 const VALID_TYPES: AssetType[] = ['skill', 'prompt', 'rule', 'mcp', 'workflow', 'agent'];
 

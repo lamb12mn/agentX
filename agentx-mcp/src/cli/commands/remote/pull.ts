@@ -2,7 +2,7 @@ import { Command } from 'commander';
 import chalk from 'chalk';
 import { getRemote } from '../../../remote/config.js';
 import { fetchAssets, fetchAsset } from '../../../remote/client.js';
-import { createAsset, updateAsset } from '../../../store/assets.js';
+import { createAsset } from '../../../store/assets.js';
 import { getBaseDir, withDb } from '../../../cli/common.js';
 
 /**
@@ -36,5 +36,5 @@ export function registerPull(remote: Command) {
                 console.error(chalk.red(`Pull failed: ${(err as Error).message}`));
                 process.exit(1);
             }
-        });
+        }));
 }

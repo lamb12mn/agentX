@@ -16,10 +16,19 @@ dist/
 Thumbs.db
 
 # Auto-generated project artifacts
+.autoresearch/
 autoresearch/
 .codegraph/
 .promptx/
 .codebuddy/
 
 # Stray files
-k.includes('multi')
+*.log
+tsc_result.txt
+report.txt
+final_report.txt
+vitest-*.txt
+vt*.txt
+
+# Accidentally created file from JS evaluation
+k.includes\('multi'\)

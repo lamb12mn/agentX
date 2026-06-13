@@ -2,9 +2,9 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, rmSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
-import { initDb, closeDb } from '../../src/store/db';
-import { createAsset } from '../../src/store/assets';
-import { searchAssets } from '../../src/store/search';
+import { initDb, closeDb } from '../../src/store/db.js';
+import { createAsset } from '../../src/store/assets.js';
+import { searchAssets } from '../../src/store/search.js';
 
 describe('search module', () => {
   let tmpDir: string;

@@ -2,6 +2,7 @@
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
+import { join } from 'path';
 import { initDb, closeDb } from './store/db.js';
 import { getBaseDir, getDbPath } from './cli/common.js';
 import { registerSkillTools } from './tools/skills.js';
@@ -17,7 +18,10 @@ import { registerCloneTools } from './tools/clone.js';
 import { registerVersionTools } from './tools/versions.js';
 import { registerExportTools } from './tools/export.js';
 import { registerDependencyTools } from './tools/dependencies.js';
+import { registerTeamTools } from './tools/teams.js';
+import { initTracing, traceToolCall } from './observability/index.js';
 import { formatError, ErrorCode } from './utils/errors.js';
+import { CredentialVault } from './security/index.js';
 
 type AnyHandler = {
   description: string;
@@ -100,6 +104,7 @@ const cloneTools = registerCloneTools(baseDir);
 const versionTools = registerVersionTools();
 const exportTools = registerExportTools(baseDir);
 const dependencyTools = registerDependencyTools();
+const teamTools = registerTeamTools(baseDir);
 
 const allTools: Record<string, AnyHandler> = {
   ...(skillTools as unknown as Record<string, AnyHandler>),
@@ -115,6 +120,7 @@ const allTools: Record<string, AnyHandler> = {
   ...(versionTools as unknown as Record<string, AnyHandler>),
   ...(exportTools as unknown as Record<string, AnyHandler>),
   ...(dependencyTools as unknown as Record<string, AnyHandler>),
+  ...(teamTools as unknown as Record<string, AnyHandler>),
 };
 
 // ---- Enhanced tools (only when ENHANCED) ----
@@ -295,6 +301,93 @@ if (ENHANCED && getCacheStats && clearAssetCache && getSystemStats && pluginLoad
       inputSchema: { type: 'object' },
       handler: async () => mobileUI!.generateCSS(),
     },
+
+    // ── Vault tools ─────────────────────────────────────────────────────
+    'vault.init': {
+      description: 'Initialise the credential vault directory',
+      inputSchema: { type: 'object', properties: {} },
+      handler: async () => {
+        const vault = new CredentialVault();
+        await vault.init();
+        return { success: true, message: 'Vault initialised' };
+      },
+    },
+    'vault.store': {
+      description: 'Store a credential (encrypted with AES-256-GCM)',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          key: { type: 'string', description: 'Credential identifier (e.g. "mcp.github.token")' },
+          value: { type: 'string', description: 'The secret value' },
+          scope: {
+            type: 'array', items: { type: 'string' },
+            description: 'Which features use this credential',
+          },
+          autoRotateDays: {
+            type: 'number', description: 'Optional auto-rotation interval in days',
+          },
+        },
+        required: ['key', 'value'],
+      },
+      handler: async ({ key, value, scope, autoRotateDays }: any) => {
+        const vault = new CredentialVault();
+        await vault.store({ key, value, scope: scope ?? [], autoRotateDays });
+        return { success: true, key };
+      },
+    },
+    'vault.get': {
+      description: 'Retrieve a credential value by key',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          key: { type: 'string', description: 'Credential identifier' },
+        },
+        required: ['key'],
+      },
+      handler: async ({ key }: { key: string }) => {
+        const vault = new CredentialVault();
+        const value = await vault.get(key);
+        return { key, found: value !== null, value: value ?? undefined };
+      },
+    },
+    'vault.list': {
+      description: 'List all stored credential keys and scopes (never values)',
+      inputSchema: { type: 'object', properties: {} },
+      handler: async () => {
+        const vault = new CredentialVault();
+        const entries = await vault.list();
+        return { count: entries.length, entries };
+      },
+    },
+    'vault.delete': {
+      description: 'Delete a credential by key',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          key: { type: 'string', description: 'Credential identifier to delete' },
+        },
+        required: ['key'],
+      },
+      handler: async ({ key }: { key: string }) => {
+        const vault = new CredentialVault();
+        const deleted = await vault.delete(key);
+        return { success: deleted, key };
+      },
+    },
+    'vault.audit': {
+      description: 'Read vault audit log (most recent entries first)',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          limit: { type: 'number', description: 'Max audit entries to return (default 50)' },
+        },
+      },
+      handler: async ({ limit }: { limit?: number }) => {
+        const vault = new CredentialVault();
+        const entries = await vault.getAuditLog(limit);
+        return { count: entries.length, entries };
+      },
+    },
   };
   Object.assign(allTools, enhancedTools);
 }
@@ -332,7 +425,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     };
   }
   try {
-    const result = await tool.handler(args as never);
+    const result = await traceToolCall(name, args, () => tool.handler(args as never));
     return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -394,6 +487,8 @@ async function initializeEnhancedModules(): Promise<void> {
 }
 
 async function main(): Promise<void> {
+  initTracing();
+
   if (ENHANCED) {
     console.log('Starting AgentX MCP Server v2.0 (enhanced)...');
     await initializeEnhancedModules();

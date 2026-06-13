@@ -1,6 +1,7 @@
 import Database from 'better-sqlite3';
 import { mkdirSync } from 'fs';
 import { dirname } from 'path';
+import { ensureExecutionTables } from './executions.js';
 
 let db: Database.Database | undefined;
 
@@ -88,6 +89,9 @@ export function initDb(dbPath: string): void {
       DELETE FROM assets_fts WHERE id = old.id;
     END;
   `);
+
+  // 初始化执行会话表（幂等）
+  ensureExecutionTables();
 }
 
 /** 获取数据库实例，未初始化时抛出错误 */

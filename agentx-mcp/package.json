@@ -29,7 +29,8 @@
     "prepublishOnly": "npm run build && npm run typecheck && npm test",
     "dev": "tsx watch src/index.ts",
     "dev:enhanced": "set AGENTX_ENHANCED=true && tsx watch src/index.ts",
-    "web": "tsx src/web/server.ts"
+    "web": "tsx src/web/server.ts",
+    "postinstall": "node -e \"try{require('keytar')}catch(e){console.log('keytar not installed - OS keychain support disabled')}\""
   },
   "keywords": [
     "mcp",
@@ -55,7 +56,16 @@
     "uuid": "^14.0.0",
     "zod": "^4.3.6",
     "axios": "^1.16.0",
-    "express": "^5.2.1"
+    "express": "^5.2.1",
+    "@opentelemetry/api": "^1.9.0",
+    "@opentelemetry/sdk-node": "^0.57.0",
+    "@opentelemetry/exporter-trace-otlp-http": "^0.57.0",
+    "@opentelemetry/resources": "^1.30.0",
+    "@opentelemetry/semantic-conventions": "^1.30.0",
+    "@opentelemetry/sdk-trace-node": "^1.30.0"
+  },
+  "optionalDependencies": {
+    "keytar": "^7.9.0"
   },
   "devDependencies": {
     "@types/archiver": "^7.0.0",

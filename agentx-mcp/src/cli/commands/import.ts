@@ -48,5 +48,5 @@ export function registerImportCommand(program: Command): void {
       if (result.imported.length === 0 && result.errors.length === 0) {
         console.log(chalk.yellow('Nothing to import.'));
       }
-    });
+    }));
 }
