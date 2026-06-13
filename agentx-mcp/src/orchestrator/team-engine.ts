@@ -770,7 +770,12 @@ export class TeamEngine extends EventEmitter {
       return await this.executeHumanStep(agent, input, timeout, startTime, sessionId);
     }
 
-    // Priority 1: Test handler override
+    // Priority 1: Nested sub-team
+    if (step?.sub_team) {
+      return await this.executeSubTeam(step.sub_team, input, timeout, startTime, agentHandler);
+    }
+
+    // Priority 2: Test handler override
     if (agentHandler) {
       const result = await this.executeWithTimeout(
         () => agentHandler(agent, input, timeout),
@@ -778,11 +783,6 @@ export class TeamEngine extends EventEmitter {
         agent,
       );
       return { ...result, durationMs: Date.now() - startTime };
-    }
-
-    // Priority 2: Nested sub-team
-    if (step?.sub_team) {
-      return await this.executeSubTeam(step.sub_team, input, timeout, startTime);
     }
 
     // Priority 3: Real AI provider
@@ -890,9 +890,10 @@ export class TeamEngine extends EventEmitter {
     input: Record<string, unknown>,
     timeout: number,
     startTime: number,
+    agentHandler?: ExecutionOptions['agentHandler'],
   ): Promise<StepResult> {
     log.info('team.sub_team.start', { subTeamName: subTeam.name });
-    const subResult = await this.execute(subTeam, input, { timeout });
+    const subResult = await this.execute(subTeam, input, { timeout, skipPersistence: true, agentHandler });
 
     const status: StepResult['status'] = subResult.status === 'completed' ? 'completed' : 'failed';
 

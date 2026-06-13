@@ -670,16 +670,6 @@ describe('TeamEngine Phase B — Human-in-the-loop', () => {
   });
 
   it('pauses and waits for approval when agent_type is human', async () => {
-    const humanApproved = new Promise<{ role: string; data: Record<string, unknown> }>((resolve) => {
-      setTimeout(() => {
-        const pending = engine.getPendingApprovals();
-        expect(pending).toHaveLength(1);
-        expect(pending[0].role).toBe('reviewer');
-        engine.approve(pending[0].sessionId, { approved: true, comment: 'looks good' });
-        resolve({ role: pending[0].role, data: { approved: true, comment: 'looks good' } });
-      }, 10);
-    });
-
     const config: TeamConfig = {
       name: 'human-loop',
       version: '1.0.0',
@@ -707,26 +697,27 @@ describe('TeamEngine Phase B — Human-in-the-loop', () => {
       return stubHandler(agent, input);
     };
 
-    const result = await engine.execute(config, {}, { agentHandler: handler, skipPersistence: true });
-    const approval = await humanApproved;
+    const executionPromise = engine.execute(config, {}, { agentHandler: handler, skipPersistence: true });
+
+    // Wait for the human step to become pending
+    await new Promise(r => setTimeout(r, 50));
+
+    const pending = engine.getPendingApprovals();
+    expect(pending).toHaveLength(1);
+    expect(pending[0].role).toBe('reviewer');
+    engine.approve(pending[0].sessionId, { approved: true, comment: 'looks good' });
+
+    const result = await executionPromise;
 
     expect(result.status).toBe('completed');
-    expect(result.steps).toHaveLength(2);
-    expect(result.steps[1].role).toBe('reviewer');
-    expect(result.steps[1].status).toBe('completed');
-    expect(result.steps[1].output).toHaveProperty('approved', true);
+    // Sequential pipeline only executes the 'to' role (reviewer); 'from' role is not run
+    expect(result.steps).toHaveLength(1);
+    expect(result.steps[0].role).toBe('reviewer');
+    expect(result.steps[0].status).toBe('completed');
+    expect(result.steps[0].output).toHaveProperty('approved', true);
   });
 
   it('rejects a pending human step and marks it failed', async () => {
-    const rejectionHandled = new Promise<void>((resolve) => {
-      setTimeout(() => {
-        const pending = engine.getPendingApprovals();
-        expect(pending).toHaveLength(1);
-        engine.reject(pending[0].sessionId, 'Not satisfied with the result');
-        resolve();
-      }, 10);
-    });
-
     const config: TeamConfig = {
       name: 'human-reject',
       version: '1.0.0',
@@ -753,14 +744,23 @@ describe('TeamEngine Phase B — Human-in-the-loop', () => {
       return stubHandler(agent, input);
     };
 
-    const result = await engine.execute(config, {}, { agentHandler: handler, skipPersistence: true });
-    await rejectionHandled;
+    const executionPromise = engine.execute(config, {}, { agentHandler: handler, skipPersistence: true });
+
+    // Wait for the human step to become pending
+    await new Promise(r => setTimeout(r, 50));
+
+    const pending = engine.getPendingApprovals();
+    expect(pending).toHaveLength(1);
+    engine.reject(pending[0].sessionId, 'Not satisfied with the result');
+
+    const result = await executionPromise;
 
     expect(result.status).toBe('failed');
-    expect(result.steps).toHaveLength(2);
-    expect(result.steps[1].role).toBe('reviewer');
-    expect(result.steps[1].status).toBe('failed');
-    expect(result.steps[1].error).toContain('Not satisfied with the result');
+    // Only the human step (reviewer) executes; the 'from' agent is not run in sequential pipeline
+    expect(result.steps).toHaveLength(1);
+    expect(result.steps[0].role).toBe('reviewer');
+    expect(result.steps[0].status).toBe('failed');
+    expect(result.steps[0].error).toContain('Not satisfied with the result');
   });
 
   it('times out a pending human step after approval_timeout', async () => {
@@ -795,10 +795,11 @@ describe('TeamEngine Phase B — Human-in-the-loop', () => {
     const elapsed = Date.now() - start;
 
     expect(result.status).toBe('failed');
-    expect(result.steps).toHaveLength(2);
-    expect(result.steps[1].role).toBe('reviewer');
-    expect(result.steps[1].status).toBe('failed');
-    expect(result.steps[1].error).toContain('timed out');
+    // Only the human step (reviewer) executes; the 'from' agent is not run in sequential pipeline
+    expect(result.steps).toHaveLength(1);
+    expect(result.steps[0].role).toBe('reviewer');
+    expect(result.steps[0].status).toBe('failed');
+    expect(result.steps[0].error).toContain('timed out');
     expect(elapsed).toBeGreaterThanOrEqual(80); // should have waited at least ~100ms
   });
 
