@@ -2,9 +2,8 @@
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
-import { homedir } from 'os';
-import { join } from 'path';
 import { initDb, closeDb } from './store/db.js';
+import { getBaseDir, getDbPath } from './cli/common.js';
 import { registerSkillTools } from './tools/skills.js';
 import { registerAgentTools } from './tools/agents.js';
 import { registerPromptTools } from './tools/prompts.js';
@@ -28,8 +27,8 @@ type AnyHandler = {
 
 const ENHANCED = process.env.AGENTX_ENHANCED === 'true';
 
-const baseDir = process.env.AGENTX_DIR ?? join(homedir(), '.agentx');
-const dbPath = join(baseDir, 'agentx.db');
+const baseDir = getBaseDir();
+const dbPath = getDbPath();
 
 initDb(dbPath);
 

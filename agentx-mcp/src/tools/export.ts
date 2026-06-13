@@ -4,6 +4,7 @@ import { exportAsZip, exportAsJson, exportAsYaml } from '../utils/zip.js';
 import type { AgentConfig, AssetType } from '../types.js';
 import yaml from 'js-yaml';
 import { createError, ErrorCode } from '../utils/errors.js';
+import { getBaseDir } from '../cli/common.js';
 
 /**
  * Export MCP tools - provides agent export and bulk export functionality
@@ -88,7 +89,7 @@ export function registerExportTools(baseDir: string) {
         description: 'Export all assets. Format "claude" exports agents only to CLAUDE.md format. Other formats export all assets.',
       },
       handler: async ({ format = 'claude', type, output }: { format?: string; type?: string; output?: string }) => {
-        const baseDir = process.env.AGENTX_DIR ?? join(homedir(), '.agentx');
+        const baseDir = getBaseDir();
 
         if (format === 'claude') {
           // 仅导出agents
@@ -152,5 +153,5 @@ export function registerExportTools(baseDir: string) {
   };
 }
 
-import { join } from 'path';
-import { homedir } from 'os';
+
+
