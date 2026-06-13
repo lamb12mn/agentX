@@ -14,7 +14,7 @@ const VALID_TYPES: AssetType[] = ['skill', 'prompt', 'rule', 'mcp', 'workflow', 
 /**
  * Register the `batch` command — batch delete and tag operations
  */
-export function registerBatchCommand(program: Command): void {
+export function registerBatchCommand(batch: Command): void {
   const deleteCmd = new Command('delete')
     .description('Delete multiple assets by ID')
     .argument('<ids...>', 'Asset IDs to delete')
@@ -105,7 +105,7 @@ export function registerBatchCommand(program: Command): void {
       }
     });
 
-  program.addCommand(deleteCmd);
+  batch.addCommand(deleteCmd);
 
   const tagCmd = new Command('tag')
     .description('Add or remove tags from multiple assets')
@@ -170,5 +170,5 @@ export function registerBatchCommand(program: Command): void {
       }
     });
 
-  program.addCommand(tagCmd);
+  batch.addCommand(tagCmd);
 }

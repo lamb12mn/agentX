@@ -7,8 +7,8 @@ import { getAsset, listAssets } from '../../../store/assets.js';
 /**
  * Register the `push` command — push assets to a remote endpoint
  */
-export function registerPush(program: Command) {
-    program
+export function registerPush(remote: Command) {
+    remote
         .command('push <remote> [assetId]')
         .description('Push assets to remote (if assetId omitted, push all)')
         .action(async (remoteName: string, assetId?: string) => {

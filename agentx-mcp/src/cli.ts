@@ -59,13 +59,16 @@ const mcp = program.command('mcp').description('MCP server commands');
 registerMcpSend(mcp);
 registerMcpInspect(mcp);
 
+// Batch operations
+const batch = program.command('batch').description('Batch operations');
+registerBatchCommand(batch);
+
 // Asset management commands
 registerListCommand(program);
 registerSearchCommand(program);
 registerInfoCommand(program);
 registerGetCommand(program);
 registerDeleteCommand(program);
-registerBatchCommand(program);
 registerCloneCommand(program);
 registerExportCommand(program);
 registerImportCommand(program);

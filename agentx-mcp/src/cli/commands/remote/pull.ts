@@ -9,8 +9,8 @@ import { createAsset, updateAsset } from '../../../store/assets.js';
 /**
  * Register the `pull` command — pull assets from a remote endpoint
  */
-export function registerPull(program: Command) {
-    program
+export function registerPull(remote: Command) {
+    remote
         .command('pull <remote> [assetId]')
         .description('Pull assets from remote (if assetId omitted, pull all)')
         .action(async (remoteName: string, assetId?: string) => {

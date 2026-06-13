@@ -58,11 +58,9 @@ describe('CLI commands', () => {
   it('registers mcp send command', async () => {
     const { registerMcpSend } = await import('../../src/cli/commands/mcp/send.js');
     const program = new Command();
-    // Commander v14: 'mcp send' creates mcp parent + send child
-    registerMcpSend(program);
-    const mcpCmd = program.commands.find(c => c.name() === 'mcp');
-    expect(mcpCmd).toBeDefined();
-    expect(mcpCmd!.commands.map(c => c.name())).toContain('send');
+    const mcp = program.command('mcp');
+    registerMcpSend(mcp);
+    expect(mcp.commands.map(c => c.name())).toContain('send');
   });
 
   it('cli.ts entry module file exists', () => {
