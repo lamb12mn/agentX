@@ -1,12 +1,10 @@
 import type { Command } from 'commander';
-import { homedir } from 'os';
-import { join } from 'path';
-import { initDb } from '../../store/db.js';
 import { createAsset } from '../../store/assets.js';
 import type { AssetType } from '../../types.js';
 import chalk from 'chalk';
 import { input, editor, confirm } from '@inquirer/prompts';
 import yaml from 'js-yaml';
+import { getBaseDir, withDb } from '../common.js';
 
 const VALID_TYPES: AssetType[] = ['skill', 'prompt', 'rule', 'mcp', 'workflow', 'agent'];
 
@@ -32,9 +30,8 @@ export function registerCreateCommand(program: Command): void {
     .option('-d, --description <desc>', 'Asset description')
     .option('--tags <tags>', 'Comma-separated tags')
     .option('-i, --interactive', 'Interactive mode (prompt for all values)')
-    .action(async (options: CreateOptions) => {
-      const baseDir = process.env.AGENTX_DIR ?? join(homedir(), '.agentx');
-      initDb(join(baseDir, 'agentx.db'));
+    .action(withDb(async (options: CreateOptions) => {
+      const baseDir = getBaseDir();
 
       const { type, name, content, description, tags, interactive } = options;
 

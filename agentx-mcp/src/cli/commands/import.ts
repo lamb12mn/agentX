@@ -1,10 +1,8 @@
 import type { Command } from 'commander';
-import { homedir } from 'os';
-import { join } from 'path';
-import { initDb } from '../../store/db.js';
 import { registerImportTools } from '../../tools/import.js';
 import type { AssetType } from '../../types.js';
 import chalk from 'chalk';
+import { getBaseDir, withDb } from '../common.js';
 
 const VALID_TYPES: AssetType[] = ['skill', 'prompt', 'rule'];
 
@@ -17,15 +15,13 @@ export function registerImportCommand(program: Command): void {
     .description('Import assets from Claude Code directories. Type: skill|prompt|rule')
     .option('-s, --source <dir>', 'Override source directory')
     .option('-t, --tags <tags>', 'Comma-separated tags to apply', 'imported,claude')
-    .action(async (type: string, opts: { source?: string; tags: string }) => {
+    .action(withDb(async (type: string, opts: { source?: string; tags: string }) => {
       if (!VALID_TYPES.includes(type as AssetType)) {
         console.error(chalk.red(`Unknown type: ${type}. Valid: ${VALID_TYPES.join(', ')}`));
         process.exit(1);
       }
 
-      const baseDir = process.env.AGENTX_DIR ?? join(homedir(), '.agentx');
-      initDb(join(baseDir, 'agentx.db'));
-
+      const baseDir = getBaseDir();
       const tags = opts.tags.split(',').map((t) => t.trim()).filter(Boolean);
       const tools = registerImportTools(baseDir);
       const result = await tools.import_from_claude.handler({

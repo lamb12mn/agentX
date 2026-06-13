@@ -1,11 +1,9 @@
 import type { Command } from 'commander';
-import { homedir } from 'os';
-import { join } from 'path';
 import { statSync } from 'fs';
-import { initDb } from '../../store/db.js';
 import { listAssets } from '../../store/assets.js';
 import chalk from 'chalk';
 import type { AssetType } from '../../types.js';
+import { getBaseDir, getDbPath } from '../common.js';
 
 const TYPES: AssetType[] = ['skill', 'prompt', 'rule', 'mcp', 'workflow', 'agent'];
 
@@ -17,9 +15,8 @@ export function registerInfoCommand(program: Command): void {
     .command('info')
     .description('Show asset library statistics')
     .action(async () => {
-      const baseDir = process.env.AGENTX_DIR ?? join(homedir(), '.agentx');
-      const dbPath = join(baseDir, 'agentx.db');
-      initDb(dbPath);
+      const dbPath = getDbPath();
+      const baseDir = getBaseDir();
 
       const counts: Record<string, number> = {};
       let total = 0;

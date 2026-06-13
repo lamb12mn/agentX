@@ -1,10 +1,9 @@
-import { homedir } from 'os';
-import { join } from 'path';
 import { Command } from 'commander';
 import chalk from 'chalk';
 import { getRemote } from '../../../remote/config.js';
 import { fetchAssets, fetchAsset } from '../../../remote/client.js';
 import { createAsset, updateAsset } from '../../../store/assets.js';
+import { getBaseDir, withDb } from '../../../cli/common.js';
 
 /**
  * Register the `pull` command — pull assets from a remote endpoint
@@ -13,13 +12,13 @@ export function registerPull(remote: Command) {
     remote
         .command('pull <remote> [assetId]')
         .description('Pull assets from remote (if assetId omitted, pull all)')
-        .action(async (remoteName: string, assetId?: string) => {
+        .action(withDb(async (remoteName: string, assetId?: string) => {
             const remote = getRemote(remoteName);
             if (!remote) {
                 console.error(chalk.red(`Remote '${remoteName}' not found.`));
                 process.exit(1);
             }
-            const baseDir = process.env.AGENTX_DIR ?? join(homedir(), '.agentx');
+            const baseDir = getBaseDir();
             try {
                 if (assetId) {
                     const asset = await fetchAsset(remote, assetId);

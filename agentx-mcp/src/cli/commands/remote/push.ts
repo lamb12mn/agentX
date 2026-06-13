@@ -3,6 +3,7 @@ import chalk from 'chalk';
 import { getRemote } from '../../../remote/config.js';
 import { pushAsset } from '../../../remote/client.js';
 import { getAsset, listAssets } from '../../../store/assets.js';
+import { withDb } from '../../../cli/common.js';
 
 /**
  * Register the `push` command — push assets to a remote endpoint
@@ -11,7 +12,7 @@ export function registerPush(remote: Command) {
     remote
         .command('push <remote> [assetId]')
         .description('Push assets to remote (if assetId omitted, push all)')
-        .action(async (remoteName: string, assetId?: string) => {
+        .action(withDb(async (remoteName: string, assetId?: string) => {
             const remote = getRemote(remoteName);
             if (!remote) {
                 console.error(chalk.red(`Remote '${remoteName}' not found.`));
@@ -34,5 +35,5 @@ export function registerPush(remote: Command) {
                 console.error(chalk.red(`Push failed: ${(err as Error).message}`));
                 process.exit(1);
             }
-        });
+        }));
 }

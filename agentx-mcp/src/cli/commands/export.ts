@@ -1,13 +1,11 @@
 import type { Command } from 'commander';
-import { homedir } from 'os';
-import { join } from 'path';
-import { initDb } from '../../store/db.js';
 import { getAsset, readAssetContent, listAssets } from '../../store/assets.js';
 import { exportAgent } from '../../export/claude.js';
 import type { AgentConfig, AssetType } from '../../types.js';
 import yaml from 'js-yaml';
 import chalk from 'chalk';
 import { exportAsZip, exportAsJson, exportAsYaml } from '../../utils/zip.js';
+import { getBaseDir, withDb } from '../common.js';
 
 /**
  * Register the `export` and `export-all` commands — export assets to various formats
@@ -17,10 +15,7 @@ export function registerExportCommand(program: Command): void {
     .command('export <id>')
     .description('Export an agent to CLAUDE.md + settings.json')
     .option('-o, --output <dir>', 'Output directory', '.')
-    .action(async (id: string, opts: { output: string }) => {
-      const baseDir = process.env.AGENTX_DIR ?? join(homedir(), '.agentx');
-      initDb(join(baseDir, 'agentx.db'));
-
+    .action(withDb(async (id: string, opts: { output: string }) => {
       const asset = await getAsset(id);
       if (!asset) {
         console.error(chalk.red(`Asset not found: ${id}`));
@@ -44,7 +39,7 @@ export function registerExportCommand(program: Command): void {
       console.log(chalk.green('Exported:'));
       console.log(`  ${chalk.cyan('CLAUDE.md:')}   ${result.claude_md_path}`);
       console.log(`  ${chalk.cyan('settings.json:')} ${result.settings_json_path}`);
-    });
+    }));
 
   // 新增：导出所有资产
   program
@@ -53,9 +48,8 @@ export function registerExportCommand(program: Command): void {
     .option('-f, --format <format>', 'Export format: claude|zip|json|yaml', 'claude')
     .option('-t, --type <type>', `Filter by type: ${['skill', 'prompt', 'rule', 'mcp', 'workflow', 'agent'].join('|')}`)
     .option('-o, --output <path>', 'Output file or directory')
-    .action(async (opts: { format: string; type?: string; output?: string }) => {
-      const baseDir = process.env.AGENTX_DIR ?? join(homedir(), '.agentx');
-      initDb(join(baseDir, 'agentx.db'));
+    .action(withDb(async (opts: { format: string; type?: string; output?: string }) => {
+      const baseDir = getBaseDir();
 
       const format = opts.format as 'claude' | 'zip' | 'json' | 'yaml';
       const type = opts.type as AssetType | undefined;
@@ -103,6 +97,5 @@ export function registerExportCommand(program: Command): void {
         console.error(chalk.red('Export failed:'), err instanceof Error ? err.message : err);
         process.exit(1);
       }
-    });
+    }));
 }
-

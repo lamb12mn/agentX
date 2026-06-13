@@ -1,11 +1,9 @@
 import type { Command } from 'commander';
-import { homedir } from 'os';
-import { join } from 'path';
-import { initDb } from '../../store/db.js';
 import { listAssets, getAsset, readAssetContent } from '../../store/assets.js';
 import chalk from 'chalk';
 import yaml from 'js-yaml';
 import type { AssetType } from '../../types.js';
+import { withDb } from '../common.js';
 
 /**
  * Validation result for a single asset
@@ -64,24 +62,6 @@ async function validateAsset(id: string): Promise<ValidationEntry> {
 }
 
 /**
- * Validate all assets in database
- */
-async function validateAll(): Promise<ValidationEntry[]> {
-  initDb(join(process.env.AGENTX_DIR ?? join(homedir(), '.agentx'), 'agentx.db'));
-  const results: ValidationEntry[] = [];
-
-  for (const type of VALID_TYPES) {
-    const assets = await listAssets(type);
-    for (const asset of assets) {
-      const result = await validateAsset(asset.id);
-      results.push(result);
-    }
-  }
-
-  return results;
-}
-
-/**
  * Register the `validate` command — validate asset integrity
  */
 export function registerValidateCommand(program: Command): void {
@@ -90,10 +70,7 @@ export function registerValidateCommand(program: Command): void {
     .description('Validate asset integrity (optional asset ID)')
     .option('-t, --type <type>', `Filter by type: ${VALID_TYPES.join('|')}`)
     .option('-q, --quiet', 'Only show errors')
-    .action(async (id?: string, options?: { type?: string; quiet?: boolean }) => {
-      const baseDir = process.env.AGENTX_DIR ?? join(homedir(), '.agentx');
-      initDb(join(baseDir, 'agentx.db'));
-
+    .action(withDb(async (id?: string, options?: { type?: string; quiet?: boolean }) => {
       const results: ValidationEntry[] = [];
 
       if (id) {
@@ -118,16 +95,12 @@ export function registerValidateCommand(program: Command): void {
 
       // Output results
       const quiet = options?.quiet ?? false;
-      let hasErrors = false;
-      let hasWarnings = false;
 
       for (const r of results) {
         if (r.errors.length > 0) {
-          hasErrors = true;
           console.log(chalk.red(`✗ ${r.name} (${r.type})`));
           r.errors.forEach(e => console.log(chalk.red(`  Error: ${e}`)));
         } else if (!quiet && r.warnings.length > 0) {
-          hasWarnings = true;
           console.log(chalk.yellow(`⚠ ${r.name} (${r.type})`));
           r.warnings.forEach(w => console.log(chalk.yellow(`  Warning: ${w}`)));
         } else if (!quiet) {
@@ -145,5 +118,5 @@ export function registerValidateCommand(program: Command): void {
       if (invalid > 0) {
         process.exit(1);
       }
-    });
+    }));
 }

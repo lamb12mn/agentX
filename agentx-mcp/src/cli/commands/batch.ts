@@ -1,15 +1,10 @@
 import { Command } from 'commander';
-import { homedir } from 'os';
-import { join } from 'path';
-import { initDb } from '../../store/db.js';
-import { getAsset, deleteAsset, listAssets } from '../../store/assets.js';
-import { confirm, input, checkbox } from '@inquirer/prompts';
+import { getAsset, batchDeleteAssets, batchAddTags, batchRemoveTags } from '../../store/assets.js';
+import { confirm } from '@inquirer/prompts';
 import chalk from 'chalk';
 import type { AssetType } from '../../types.js';
-import { batchDeleteAssets, batchAddTags, batchRemoveTags } from '../../store/assets.js';
 import { batchCheckDependencies } from '../../store/dependencies.js';
-
-const VALID_TYPES: AssetType[] = ['skill', 'prompt', 'rule', 'mcp', 'workflow', 'agent'];
+import { withDb } from '../common.js';
 
 /**
  * Register the `batch` command — batch delete and tag operations
@@ -20,10 +15,7 @@ export function registerBatchCommand(batch: Command): void {
     .argument('<ids...>', 'Asset IDs to delete')
     .option('-y, --yes', 'Skip confirmation prompt')
     .option('--check-deps', 'Check dependencies before deletion', true)
-    .action(async (ids: string[], options: { yes?: boolean; checkDeps?: boolean }) => {
-      const baseDir = process.env.AGENTX_DIR ?? join(homedir(), '.agentx');
-      initDb(join(baseDir, 'agentx.db'));
-
+    .action(withDb(async (ids: string[], options: { yes?: boolean; checkDeps?: boolean }) => {
       const assetsToDelete: Array<{ id: string; name: string; type: AssetType }> = [];
       const notFound: string[] = [];
 
@@ -103,7 +95,7 @@ export function registerBatchCommand(batch: Command): void {
         console.error(chalk.red('Batch delete failed:'), (e as Error).message);
         process.exit(1);
       }
-    });
+    }));
 
   batch.addCommand(deleteCmd);
 
@@ -113,15 +105,12 @@ export function registerBatchCommand(batch: Command): void {
     .argument('<action>', 'Action: add|remove')
     .argument('<tags...>', 'Tags to add/remove')
     .option('-y, --yes', 'Skip confirmation prompt')
-    .action(async (idsStr: string, action: 'add' | 'remove', tags: string[], options: { yes?: boolean }) => {
+    .action(withDb(async (idsStr: string, action: 'add' | 'remove', tags: string[], options: { yes?: boolean }) => {
       const ids = idsStr.split(',').map(s => s.trim());
       if (action !== 'add' && action !== 'remove') {
         console.error(chalk.red('Invalid action. Use "add" or "remove"'));
         process.exit(1);
       }
-
-      const baseDir = process.env.AGENTX_DIR ?? join(homedir(), '.agentx');
-      initDb(join(baseDir, 'agentx.db'));
 
       const validIds: string[] = [];
       const notFound: string[] = [];
@@ -168,7 +157,7 @@ export function registerBatchCommand(batch: Command): void {
         console.error(chalk.red('Batch tag operation failed:'), (e as Error).message);
         process.exit(1);
       }
-    });
+    }));
 
   batch.addCommand(tagCmd);
 }

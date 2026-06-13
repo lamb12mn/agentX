@@ -1,12 +1,10 @@
 import type { Command } from 'commander';
-import { homedir } from 'os';
-import { join } from 'path';
-import { initDb } from '../../store/db.js';
 import { getAsset, deleteAsset, listAssets } from '../../store/assets.js';
 import { confirm } from '@inquirer/prompts';
 import chalk from 'chalk';
 import type { AssetType } from '../../types.js';
 import { checkDeleteSafety } from '../../store/dependencies.js';
+import { getBaseDir, withDb } from '../common.js';
 
 const VALID_TYPES: AssetType[] = ['skill', 'prompt', 'rule', 'mcp', 'workflow', 'agent'];
 
@@ -19,9 +17,8 @@ export function registerDeleteCommand(program: Command): void {
     .description('Delete asset(s) by ID. Supports: delete <id> [id...], delete --type <type>')
     .option('-y, --yes', 'Skip confirmation prompt')
     .option('-t, --type <type>', `Delete all assets of type: ${VALID_TYPES.join('|')}`)
-    .action(async (ids: string[] | undefined, options?: { yes?: boolean; type?: string }) => {
-      const baseDir = process.env.AGENTX_DIR ?? join(homedir(), '.agentx');
-      initDb(join(baseDir, 'agentx.db'));
+    .action(withDb(async (ids: string[] | undefined, options?: { yes?: boolean; type?: string }) => {
+      const baseDir = getBaseDir();
 
       const idsToDelete: string[] = [];
       const assetsToDelete: Array<{ id: string; name: string; type: AssetType }> = [];
@@ -113,5 +110,5 @@ export function registerDeleteCommand(program: Command): void {
       }
 
       console.log(chalk.green(`✓ Deleted ${deleted} asset(s)`));
-    });
+    }));
 }

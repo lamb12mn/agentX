@@ -1,6 +1,7 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
 import { cloneAsset, getAsset } from '../../store/assets.js';
+import { getBaseDir, withDb } from '../common.js';
 
 /**
  * Register the `clone` command — clone an asset to create a copy
@@ -11,10 +12,9 @@ export function registerCloneCommand(program: Command): void {
     .description('克隆资产（创建副本）')
     .argument('<id>', '要克隆的资产ID')
     .option('-n, --name <name>', '新资产名称（可选）')
-    .action(async (id: string, options: { name?: string }) => {
+    .action(withDb(async (id: string, options: { name?: string }) => {
+      const baseDir = getBaseDir();
       try {
-        const baseDir = process.env.AGENTX_DIR ?? process.cwd();
-
         // 验证源资产存在
         const sourceAsset = await getAsset(id);
         if (!sourceAsset) {
@@ -36,5 +36,5 @@ export function registerCloneCommand(program: Command): void {
         console.log(chalk.red(`❌ Failed to clone asset: ${error instanceof Error ? error.message : String(error)}`));
         process.exit(1);
       }
-    });
+    }));
 }

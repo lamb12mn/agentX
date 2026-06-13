@@ -1,10 +1,8 @@
 import type { Command } from 'commander';
-import { homedir } from 'os';
-import { join } from 'path';
-import { initDb } from '../../store/db.js';
 import { getAsset, readAssetContent } from '../../store/assets.js';
 import { formatMeta } from '../format.js';
 import chalk from 'chalk';
+import { withDb } from '../common.js';
 
 /**
  * Register the `get` command — show asset details and optional content
@@ -14,9 +12,7 @@ export function registerGetCommand(program: Command): void {
     .command('get <id>')
     .description('Show asset details and content')
     .option('-c, --content', 'Print asset content')
-    .action(async (id: string, opts: { content?: boolean }) => {
-      const baseDir = process.env.AGENTX_DIR ?? join(homedir(), '.agentx');
-      initDb(join(baseDir, 'agentx.db'));
+    .action(withDb(async (id: string, opts: { content?: boolean }) => {
 
       const asset = await getAsset(id);
       if (!asset) {
@@ -31,5 +27,5 @@ export function registerGetCommand(program: Command): void {
         console.log('\n' + chalk.cyan('Content:'));
         console.log(content);
       }
-    });
+    }));
 }
