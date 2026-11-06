@@ -2,10 +2,14 @@ import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { listAssets } from '../store/assets.js';
+import { initDb } from '../store/db.js';
+import { getDbPath } from '../cli/common.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
-const port = process.env.PORT || 3001;
+const port = Number(process.env.PORT) || 3001;
+
+initDb(getDbPath());
 
 app.use(express.static(__dirname));
 

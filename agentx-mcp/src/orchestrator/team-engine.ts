@@ -108,14 +108,190 @@ function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+/** Truthiness used by the condition evaluator (empty string / 0 / null / false / NaN are falsy). */
+function isTruthy(value: unknown): boolean {
+  if (typeof value === 'string') return value !== '';
+  if (typeof value === 'number') return value !== 0 && !Number.isNaN(value);
+  return Boolean(value);
+}
+
+/** Compare two operands with a whitelisted operator only. */
+function compareValues(left: unknown, op: string, right: unknown): boolean {
+  switch (op) {
+    case '==': return left == right; // eslint-disable-line eqeqeq
+    case '!=': return left != right; // eslint-disable-line eqeqeq
+    case '===': return left === right;
+    case '!==': return left !== right;
+    case '>': return Number(left) > Number(right);
+    case '<': return Number(left) < Number(right);
+    case '>=': return Number(left) >= Number(right);
+    case '<=': return Number(left) <= Number(right);
+    default: throw new Error(`Unsupported operator: ${op}`);
+  }
+}
+
+/**
+ * Tokenize a condition expression. Throws on any character outside the
+ * whitelist, which is what keeps `require`, `globalThis`, backticks, etc. out.
+ */
+function tokenizeCondition(src: string): Array<{ kind: 'num' | 'str' | 'ident' | 'op'; value: string }> {
+  const ops = ['===', '!==', '>=', '<=', '==', '!=', '&&', '||', '>', '<', '!', '(', ')'];
+  const tokens: Array<{ kind: 'num' | 'str' | 'ident' | 'op'; value: string }> = [];
+  let i = 0;
+
+  while (i < src.length) {
+    const ch = src[i];
+
+    if (/\s/.test(ch)) { i++; continue; }
+
+    if (ch === '"' || ch === "'") {
+      const end = src.indexOf(ch, i + 1);
+      if (end === -1) throw new Error('Unterminated string literal');
+      tokens.push({ kind: 'str', value: src.slice(i + 1, end) });
+      i = end + 1;
+      continue;
+    }
+
+    if (/[0-9]/.test(ch) || (ch === '.' && /[0-9]/.test(src[i + 1] ?? ''))) {
+      const m = /^[0-9.]+/.exec(src.slice(i))!;
+      tokens.push({ kind: 'num', value: m[0] });
+      i += m[0].length;
+      continue;
+    }
+
+    if (/[A-Za-z_$]/.test(ch)) {
+      const m = /^[A-Za-z0-9_$.]+/.exec(src.slice(i))!;
+      tokens.push({ kind: 'ident', value: m[0] });
+      i += m[0].length;
+      continue;
+    }
+
+    const op = ops.find(o => src.startsWith(o, i));
+    if (!op) throw new Error(`Unexpected character '${ch}' in condition`);
+    tokens.push({ kind: 'op', value: op });
+    i += op.length;
+  }
+
+  return tokens;
+}
+
+/**
+ * Recursive-descent evaluator over the token stream.
+ * Grammar: or := and ('||' and)* | and := cmp ('&&' cmp)*
+ *          cmp := unary (compareOp unary)? | unary := '!'unary | primary
+ *          primary := '(' or ')' | number | string | true | false | null | dotted-path
+ * Paths resolve only against the `input` / `output` roots and only through own
+ * properties, so nothing on the prototype chain (constructor, __proto__) is reachable.
+ */
+function evalConditionTokens(
+  tokens: Array<{ kind: 'num' | 'str' | 'ident' | 'op'; value: string }>,
+  scope: { input: Record<string, unknown>; output: Record<string, unknown> },
+): unknown {
+  let pos = 0;
+
+  const peek = () => tokens[pos];
+  const eat = (value: string) => {
+    if (peek()?.value !== value) throw new Error(`Expected '${value}' in condition`);
+    pos++;
+  };
+
+  function resolvePath(path: string): unknown {
+    const segments = path.split('.');
+    const root = scope as unknown as Record<string, unknown>;
+    let current: unknown = root[segments[0]];
+    if (current === undefined) return undefined;
+
+    for (let i = 1; i < segments.length; i++) {
+      if (current === null || typeof current !== 'object') return undefined;
+      const key = segments[i];
+      if (Array.isArray(current)) {
+        if (!/^\d+$/.test(key)) return undefined;
+        current = current[Number(key)];
+        continue;
+      }
+      const record = current as Record<string, unknown>;
+      // Own-property access only — never traverse the prototype chain.
+      current = Object.prototype.hasOwnProperty.call(record, key) ? record[key] : undefined;
+      if (current === undefined) return undefined;
+    }
+    return current;
+  }
+
+  function parsePrimary(): unknown {
+    const token = peek();
+    if (!token) throw new Error('Unexpected end of condition');
+
+    if (token.kind === 'op' && token.value === '(') {
+      pos++;
+      const value = parseOr();
+      eat(')');
+      return value;
+    }
+    if (token.kind === 'num') { pos++; return Number(token.value); }
+    if (token.kind === 'str') { pos++; return token.value; }
+    if (token.kind === 'ident') {
+      pos++;
+      if (token.value === 'true') return true;
+      if (token.value === 'false') return false;
+      if (token.value === 'null') return null;
+      return resolvePath(token.value);
+    }
+    if (token.kind === 'op' && (token.value === '!' || token.value === '-')) {
+      pos++;
+      const operand = parsePrimary();
+      return token.value === '!' ? !isTruthy(operand) : -Number(operand);
+    }
+    throw new Error(`Unexpected token '${token.value}' in condition`);
+  }
+
+  function parseComparison(): unknown {
+    const COMPARE_OPS = ['===', '!==', '==', '!=', '>=', '<=', '>', '<'];
+    const left = parsePrimary();
+    const next = peek();
+    if (next && next.kind === 'op' && COMPARE_OPS.includes(next.value)) {
+      pos++;
+      return compareValues(left, next.value, parsePrimary());
+    }
+    return left;
+  }
+
+  function parseAnd(): unknown {
+    let left = parseComparison();
+    while (peek()?.value === '&&') {
+      pos++;
+      const right = parseComparison();
+      left = isTruthy(left) ? right : left;
+    }
+    return left;
+  }
+
+  function parseOr(): unknown {
+    let left = parseAnd();
+    while (peek()?.value === '||') {
+      pos++;
+      const right = parseAnd();
+      left = isTruthy(left) ? left : right;
+    }
+    return left;
+  }
+
+  const result = parseOr();
+  if (pos < tokens.length) throw new Error(`Unexpected token '${tokens[pos].value}' in condition`);
+  return result;
+}
+
 /**
  * Safely evaluate a condition expression against step output and input.
  * Supports patterns like:
  *   output.confidence >= 0.8
  *   output.status === "done"
  *   input.topic !== ""
+ *   output.reviewer && output.score > 3
  *
- * Uses Function() constructor in a sandbox with only output/input in scope.
+ * Implemented as a restricted expression parser (no Function constructor, no
+ * vm): only literals, the input/output roots, own-property paths, and the
+ * comparison / logical operators above are evaluatable, so no host API is
+ * reachable from an asset-supplied condition.
  */
 function evaluateCondition(
   condition: string,
@@ -126,13 +302,11 @@ function evaluateCondition(
   if (!condition || condition.trim() === '') return true;
 
   try {
-    // Wrap condition in return statement for evaluation
-    const fn = new Function('output', 'input', `return (${condition});`);
-    const result = fn(output, input);
-    return result === true;
-  } catch {
+    const tokens = tokenizeCondition(condition);
+    return isTruthy(evalConditionTokens(tokens, { input, output }));
+  } catch (err) {
     // On parse error, execute the step (fail-open)
-    log.warn('team.condition.parse_error', { condition });
+    log.warn('team.condition.parse_error', { condition, error: (err as Error).message });
     return true;
   }
 }
@@ -158,7 +332,7 @@ function applyVariableMapping(
         ? getPathValue(aggregatedOutput, v.step_role)
         : aggregatedOutput;
       if (v.field && typeof value === 'object' && value !== null) {
-        value = (value as Record<string, unknown>)[v.field];
+        value = getPathValue(value as Record<string, unknown>, v.field);
       }
     }
 
@@ -170,13 +344,25 @@ function applyVariableMapping(
   return mapped;
 }
 
-/** Fire an HTTP webhook (fire-and-forget). */
+/** Fire an HTTP webhook (fire-and-forget). Non-http(s) targets are rejected. */
 function fireWebhook(
   webhook: { url: string; headers?: Record<string, string> },
   event: string,
   payload: Record<string, unknown>,
 ): void {
-  fetch(webhook.url, {
+  let target: URL;
+  try {
+    target = new URL(webhook.url);
+  } catch {
+    log.warn('team.webhook.invalid_url', { url: webhook.url, event });
+    return;
+  }
+  if (target.protocol !== 'http:' && target.protocol !== 'https:') {
+    log.warn('team.webhook.unsupported_protocol', { url: webhook.url, event, protocol: target.protocol });
+    return;
+  }
+
+  fetch(target, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -272,6 +458,9 @@ function buildDagLevels(
 // ── TeamEngine ───────────────────────────────────────────────────────────────
 
 export class TeamEngine extends EventEmitter {
+  /** In-memory session map is a hot cache for getStatus/getResults; completed
+   *  executions are also persisted, so only the most recent entries are kept. */
+  private static readonly MAX_SESSIONS = 100;
   private sessions = new Map<string, ExecutionState>();
   private aiAssistant?: AIAssistant;
   private aiProvider?: AiProvider;
@@ -326,7 +515,7 @@ export class TeamEngine extends EventEmitter {
     const dagLevels = buildDagLevels(teamConfig.agents, teamConfig.workflow);
     const agentMap = new Map(teamConfig.agents.map(a => [a.role, a]));
     const isDagMode = dagLevels.some(l => l.length > 1);
-    const pipeline = !isDagMode ? this.buildPipeline(teamConfig, input) : [];
+    const pipeline = !isDagMode ? this.buildPipeline(teamConfig) : [];
 
     const result: TeamExecutionResult = {
       sessionId,
@@ -357,6 +546,11 @@ export class TeamEngine extends EventEmitter {
     };
 
     this.sessions.set(sessionId, state);
+    while (this.sessions.size > TeamEngine.MAX_SESSIONS) {
+      const oldest = this.sessions.keys().next().value;
+      if (oldest === undefined) break;
+      this.sessions.delete(oldest);
+    }
     this.activeCount++;
 
     // Persist session (fire-and-forget)
@@ -386,6 +580,18 @@ export class TeamEngine extends EventEmitter {
       stepIdx: number,
     ): Promise<boolean> => {
       if (state.cancelled) { result.status = 'cancelled'; return false; }
+
+      // Conditions are evaluated against the live aggregated output, so a step
+      // can depend on the results of the steps that ran before it.
+      // (DAG mode filters per level before dispatch, hence the wfStep.condition guard there.)
+      if (wfStep.condition && !isDagMode) {
+        if (!evaluateCondition(wfStep.condition, result.aggregatedOutput, input)) {
+          log.info('team.condition.skipped', { sessionId, role: wfAgent.role, condition: wfStep.condition });
+          // Still merge a placeholder so downstream steps don't break
+          result.aggregatedOutput[wfAgent.role] = { role: wfAgent.role, skipped: true, condition: wfStep.condition };
+          return true;
+        }
+      }
 
       status.currentStep = wfAgent.role;
       this.emit('stepStart', { sessionId, role: wfAgent.role, step: stepIdx + 1 });
@@ -616,33 +822,15 @@ export class TeamEngine extends EventEmitter {
 
   /**
    * Build an ordered execution pipeline from the workflow steps.
-   * Checks conditions — skips steps whose condition evaluates to false.
+   * Conditions are NOT evaluated here — they are checked immediately before
+   * each step runs (see execStep) so that they observe real upstream output.
    */
   private buildPipeline(
     config: TeamConfig,
-    input: Record<string, unknown>,
   ): Array<{ step: TeamWorkflowStep; agent: TeamAgent }> {
     const agentMap = new Map(config.agents.map(a => [a.role, a]));
-    const aggregatedOutput: Record<string, unknown> = { ...input };
 
-    return config.workflow.filter(wf => {
-      // Evaluate condition against current aggregated output
-      if (wf.condition) {
-        const shouldRun = evaluateCondition(wf.condition, aggregatedOutput, input);
-        if (!shouldRun) {
-          log.info('team.condition.skipped', { role: wf.to, condition: wf.condition });
-          // Still merge a placeholder so downstream steps don't break
-          aggregatedOutput[wf.to] = {
-            role: wf.to,
-            skipped: true,
-            condition: wf.condition,
-          };
-        }
-        return shouldRun;
-      }
-
-      return true;
-    }).map(wf => ({
+    return config.workflow.map(wf => ({
       step: wf,
       agent: agentMap.get(wf.to)!,
     }));
@@ -996,6 +1184,8 @@ export class TeamEngine extends EventEmitter {
         role: agent.role,
         summary: `[Stub] Agent "${agent.role}" processed input with prompt: ${prompt.slice(0, 50)}...`,
         prompt,
+        // No AI provider is configured — this step did no real work.
+        simulated: true,
       },
       retries: 0,
       durationMs: Date.now() - startTime,

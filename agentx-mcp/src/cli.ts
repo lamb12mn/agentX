@@ -34,7 +34,7 @@ const program = new Command();
 program
   .name('agentx')
   .description('AgentX CLI — manage your local agent asset library')
-  .version('1.0.0')
+  .version('2.0.1')
   .configureHelp({
     sortSubcommands: true,
   });

@@ -1,5 +1,6 @@
 import type { AssetMeta, AssetType } from '../types.js';
 import { getDb } from './db.js';
+import { sanitizeFts5Query } from './search.js';
 import type { PaginationOptions, PaginatedResult } from '../types/pagination.js';
 
 /**
@@ -11,8 +12,8 @@ export async function getAssetsPaginated(
   options: PaginationOptions = {}
 ): Promise<PaginatedResult<AssetMeta>> {
   const {
-    page = 1,
-    pageSize = 20,
+    page: pageRaw = 1,
+    pageSize: pageSizeRaw = 20,
     type,
     search,
     sortBy = 'created_at',
@@ -21,6 +22,8 @@ export async function getAssetsPaginated(
   } = options;
 
   const db = getDb();
+  const page = Math.max(1, Math.trunc(pageRaw) || 1);
+  const pageSize = Math.min(500, Math.max(1, Math.trunc(pageSizeRaw) || 20));
   const offset = (page - 1) * pageSize;
 
   // 构建基础查询
@@ -35,19 +38,23 @@ export async function getAssetsPaginated(
 
   // 搜索过滤（使用FTS5全文搜索）
   if (search) {
-    query += ` AND id IN (
-      SELECT rowid FROM assets_fts 
-      WHERE assets_fts MATCH ?
-      ORDER BY rank
-    )`;
-    queryParams.push(`${search}*`);
+    // assets_fts.id stores the TEXT asset uuid, so match on it directly;
+    // the FTS rowid is an integer and would never equal a uuid.
+    const safeSearch = sanitizeFts5Query(search);
+    if (safeSearch) {
+      query += ` AND id IN (
+        SELECT id FROM assets_fts
+        WHERE assets_fts MATCH ?
+      )`;
+      queryParams.push(`${safeSearch}*`);
+    }
   }
 
   // 标签过滤
   if (filters?.tags && filters.tags.length > 0) {
     const tagConditions = filters.tags.map(() => 'tags LIKE ?').join(' AND ');
     query += ` AND (${tagConditions})`;
-    queryParams.push(...filters.tags.map(tag => `%"${tag}"%`));
+    queryParams.push(...filters.tags.map(tag => `%"${String(tag).replace(/[%_]/g, '')}"%`));
   }
 
   // 时间范围过滤
@@ -62,12 +69,6 @@ export async function getAssetsPaginated(
     }
   }
 
-  // 状态过滤
-  if (filters?.status) {
-    query += ' AND status = ?';
-    queryParams.push(filters.status);
-  }
-
   // 获取总数
   const countQuery = query.replace('SELECT *', 'SELECT COUNT(*) as count');
   const totalResult = db.prepare(countQuery).get(...queryParams) as { count: number };
@@ -77,7 +78,8 @@ export async function getAssetsPaginated(
   const validSortFields = ['name', 'type', 'created_at', 'updated_at'];
   const sortField = validSortFields.includes(sortBy) ? sortBy : 'created_at';
   const sortDirection = sortOrder.toLowerCase() === 'asc' ? 'ASC' : 'DESC';
-  query += ` ORDER BY ${sortField} ${sortDirection}`;
+  // rowid tie-breaker keeps paging stable when the sort field has duplicates
+  query += ` ORDER BY ${sortField} ${sortDirection}, rowid ASC`;
 
   // 分页
   query += ' LIMIT ? OFFSET ?';
@@ -151,7 +153,9 @@ export async function* streamAssets(
       params.push(type);
     }
 
-    query += ' LIMIT ? OFFSET ?';
+    // ORDER BY rowid gives a stable order; without it OFFSET paging can
+    // return the same row twice or skip rows.
+    query += ' ORDER BY rowid LIMIT ? OFFSET ?';
     params.push(batchSize, offset);
 
     const rows = db.prepare(query).all(...params) as Record<string, unknown>[];

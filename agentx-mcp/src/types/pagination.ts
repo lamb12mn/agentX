@@ -16,8 +16,6 @@ export interface PaginationOptions {
   filters?: {
     /** 标签过滤 */
     tags?: string[];
-    /** 状态过滤 */
-    status?: string;
     /** 日期范围 */
     dateRange?: {
       /** 起始时间戳 */

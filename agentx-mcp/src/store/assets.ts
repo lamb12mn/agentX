@@ -10,7 +10,7 @@ import {
   addDependency,
 } from './dependencies.js';
 import type { AssetMeta, AssetType } from '../types.js';
-import chalk from 'chalk';
+import { diag } from '../observability/diag.js';
 
 interface CreateAssetInput {
   type: AssetType;
@@ -264,12 +264,13 @@ export async function batchDeleteAssets(
       const dependents = dependencyMap.get(id) || [];
       if (dependents.length > 0) {
         result.blocked.push(id);
-        console.log(chalk.yellow(`  ⚠ ${id} is depended on by: ${dependents.join(', ')}`));
+        // stderr: this runs inside the MCP server, where stdout is the JSON-RPC channel
+        diag(`  ⚠ ${id} is depended on by: ${dependents.join(', ')}`);
       }
     }
 
     if (result.blocked.length > 0) {
-      console.log(chalk.red(`\n❌ ${result.blocked.length} asset(s) blocked due to dependencies. Use --force to override.`));
+      diag(`\n❌ ${result.blocked.length} asset(s) blocked due to dependencies. Use --force to override.`);
       if (options.dryRun) {
         return result;
       }

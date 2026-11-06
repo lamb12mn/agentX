@@ -83,11 +83,9 @@ function writeLog(level: LogLevel, message: string, attrs?: Record<string, unkno
 
   const output = JSON.stringify(entry) + '\n';
 
-  if (level === 'error') {
-    process.stderr.write(output);
-  } else {
-    process.stdout.write(output);
-  }
+  // Always stderr: in an stdio MCP server stdout is reserved for JSON-RPC frames,
+  // so any log line written there corrupts the protocol stream.
+  process.stderr.write(output);
 }
 
 // ---- Public API ----

@@ -3,9 +3,9 @@ import { statSync } from 'fs';
 import { listAssets } from '../../store/assets.js';
 import chalk from 'chalk';
 import type { AssetType } from '../../types.js';
-import { getBaseDir, getDbPath } from '../common.js';
+import { getBaseDir, getDbPath, withDb } from '../common.js';
 
-const TYPES: AssetType[] = ['skill', 'prompt', 'rule', 'mcp', 'workflow', 'agent'];
+const TYPES: AssetType[] = ['skill', 'prompt', 'rule', 'mcp', 'workflow', 'agent', 'team'];
 
 /**
  * Register the `info` command — show asset library statistics
@@ -14,7 +14,7 @@ export function registerInfoCommand(program: Command): void {
   program
     .command('info')
     .description('Show asset library statistics')
-    .action(async () => {
+    .action(withDb(async () => {
       const dbPath = getDbPath();
       const baseDir = getBaseDir();
 
@@ -41,5 +41,5 @@ export function registerInfoCommand(program: Command): void {
       console.log(`  ${chalk.dim('─'.repeat(20))}`);
       console.log(`  ${chalk.cyan('total:'.padEnd(12))} ${total} assets`);
       console.log(`  ${chalk.cyan('db:'.padEnd(12))} ${dbPath} (${dbSize})`);
-    });
+    }));
 }

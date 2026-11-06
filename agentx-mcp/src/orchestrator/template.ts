@@ -13,6 +13,10 @@
 /**
  * Get a value from a nested object using a dot-delimited path.
  * Returns `undefined` if any segment of the path does not exist.
+ *
+ * Only own properties are read, so paths like `constructor` or
+ * `__proto__.constructor` cannot reach the prototype chain and leak
+ * built-in objects into the rendered template.
  */
 export function getPathValue(obj: Record<string, unknown>, path: string): unknown {
   const keys = path.split('.');
@@ -22,7 +26,14 @@ export function getPathValue(obj: Record<string, unknown>, path: string): unknow
     if (current === null || current === undefined || typeof current !== 'object') {
       return undefined;
     }
-    current = (current as Record<string, unknown>)[key];
+    if (Array.isArray(current)) {
+      if (!/^\d+$/.test(key)) return undefined;
+      current = current[Number(key)];
+      continue;
+    }
+    const record = current as Record<string, unknown>;
+    if (!Object.prototype.hasOwnProperty.call(record, key)) return undefined;
+    current = record[key];
   }
 
   return current;

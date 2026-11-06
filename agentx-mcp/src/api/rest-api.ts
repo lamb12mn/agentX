@@ -2,6 +2,7 @@ import { EventEmitter } from 'events';
 
 import { listAssets, getAsset, createAsset, updateAsset, deleteAsset, batchDeleteAssets, batchAddTags, batchRemoveTags } from '../store/assets.js';
 import { getStats } from '../store/pagination.js';
+import { getCacheStats } from '../store/cache.js';
 import { getBaseDir } from '../cli/common.js';
 
 /** REST API 服务器配置 */
@@ -305,7 +306,7 @@ export class RESTAPI extends EventEmitter {
     });
 
     this.registerRoute('POST', '/api/workflows/execute', async (req: any) => {
-      return { execution: { id: req.body?.workflowId, status: 'pending', message: 'Execution not yet implemented' } };
+      return { execution: { id: req.body?.workflowId, status: 'not_implemented', message: 'Execution not yet implemented' } };
     });
 
     // 统计信息
@@ -316,7 +317,7 @@ export class RESTAPI extends EventEmitter {
 
     // 缓存统计
     this.registerRoute('GET', '/api/cache/stats', async () => {
-      return { hitRate: 0, size: 0, message: 'Cache stats available in enhanced mode only' };
+      return getCacheStats();
     });
   }
 

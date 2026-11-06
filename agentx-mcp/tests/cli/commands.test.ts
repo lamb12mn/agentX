@@ -28,18 +28,40 @@ describe('CLI commands', () => {
     expect(commands).toContain('create');
   });
 
-  it('registers batch and clone commands', async () => {
+  it('registers batch subcommands under the batch group', async () => {
     const { registerBatchCommand } = await import('../../src/cli/commands/batch.js');
     const { registerCloneCommand } = await import('../../src/cli/commands/clone.js');
 
     const program = new Command();
-    registerBatchCommand(program);
+    const batch = program.command('batch');
+    registerBatchCommand(batch);
     registerCloneCommand(program);
 
     const commands = program.commands.map(c => c.name());
-    expect(commands).toContain('delete');
-    expect(commands).toContain('tag');
-    expect(commands).toContain('clone');
+    expect(commands).toEqual(expect.arrayContaining(['batch', 'clone']));
+    expect(batch.commands.map(c => c.name())).toEqual(expect.arrayContaining(['delete', 'tag']));
+    expect(commands).not.toContain('tag');
+  });
+
+  it('registers remote and mcp subcommands on their groups', async () => {
+    const { registerRemoteAdd } = await import('../../src/cli/commands/remote/add.js');
+    const { registerRemoteList } = await import('../../src/cli/commands/remote/list.js');
+    const { registerRemoteRemove } = await import('../../src/cli/commands/remote/remove.js');
+    const { registerMcpSend } = await import('../../src/cli/commands/mcp/send.js');
+    const { registerMcpInspect } = await import('../../src/cli/commands/mcp/inspect.js');
+
+    const program = new Command();
+    const remote = program.command('remote');
+    const mcp = program.command('mcp');
+    registerRemoteAdd(remote);
+    registerRemoteList(remote);
+    registerRemoteRemove(remote);
+    registerMcpSend(mcp);
+    registerMcpInspect(mcp);
+
+    expect(program.commands.map(c => c.name())).toEqual(expect.arrayContaining(['remote', 'mcp']));
+    expect(remote.commands.map(c => c.name())).toEqual(expect.arrayContaining(['add', 'list', 'remove']));
+    expect(mcp.commands.map(c => c.name())).toEqual(expect.arrayContaining(['send', 'inspect']));
   });
 
   it('registers diagnostic commands', async () => {

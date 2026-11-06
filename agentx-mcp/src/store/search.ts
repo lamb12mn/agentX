@@ -10,8 +10,15 @@ export type { SearchResult };
 const searchCache = new LRUCache<string, SearchResult[]>({
   max: 100,
   ttl: 1000 * 30,
-  updateAgeOnGet: true,
+  // Do not refresh the TTL on every read: a hot key would otherwise never expire
+  // and keep returning deleted assets.
+  updateAgeOnGet: false,
 });
+
+/** Drop cached search results (call after an asset is deleted or changed on disk). */
+export function clearSearchCache(): void {
+  searchCache.clear();
+}
 
 function searchCacheKey(query: string, type?: AssetType, limit?: number): string {
   return `${query}::${type ?? '*' }::${limit ?? 20}`;
@@ -21,7 +28,7 @@ function searchCacheKey(query: string, type?: AssetType, limit?: number): string
  * 转义 FTS5 查询中的特殊字符，防止注入攻击
  * 移除/替换 FTS5 语法操作符，保留纯文本搜索语义
  */
-function sanitizeFts5Query(query: string): string {
+export function sanitizeFts5Query(query: string): string {
   return query
     .replace(/"/g, '')                              // 移除双引号（防止短语注入）
     .replace(/[()*^\-+~]/g, ' ')                    // 替换 FTS5 操作符为空格

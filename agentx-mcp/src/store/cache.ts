@@ -1,22 +1,24 @@
 import { LRUCache } from 'lru-cache';
 import type { AssetMeta } from '../types.js';
 
-// 配置 LRU 缓存选项
-const cacheOptions = {
+// 配置 LRU 缓存选项（运行时可通过 updateCacheConfig 覆盖）
+let assetCacheOptions = {
   max: 500, // 最大缓存条目数
   ttl: 1000 * 60 * 5, // 5分钟过期
   updateAgeOnGet: true, // 访问时更新过期时间
   allowStale: false,
 };
 
-// 创建缓存实例
-const assetCache = new LRUCache<string, AssetMeta>(cacheOptions);
-const contentCache = new LRUCache<string, string>(cacheOptions);
-const listCache = new LRUCache<string, AssetMeta[]>({
+let listCacheOptions = {
   max: 100,
   ttl: 1000 * 60 * 2, // 2分钟过期
   updateAgeOnGet: true,
-});
+};
+
+// 创建缓存实例（运行时改配置时会被重建）
+let assetCache = new LRUCache<string, AssetMeta>(assetCacheOptions);
+let contentCache = new LRUCache<string, string>(assetCacheOptions);
+let listCache = new LRUCache<string, AssetMeta[]>(listCacheOptions);
 
 // 分页缓存
 const paginatedCache = new LRUCache<string, {
@@ -215,6 +217,7 @@ export function getCacheStats(): CacheStats & {
 
 /**
  * Update cache configuration (max entries and TTL) at runtime
+ * Rebuilds the affected caches with the merged options; previously cached entries are dropped.
  * @param options - Cache configuration overrides
  */
 export function updateCacheConfig(options: {
@@ -223,16 +226,21 @@ export function updateCacheConfig(options: {
   maxList?: number;
   ttlList?: number;
 }): void {
-  if (options.max) {
-    (assetCache as any).max = options.max;
+  if (options.max !== undefined || options.ttl !== undefined) {
+    assetCacheOptions = {
+      ...assetCacheOptions,
+      max: options.max ?? assetCacheOptions.max,
+      ttl: options.ttl ?? assetCacheOptions.ttl,
+    };
+    assetCache = new LRUCache<string, AssetMeta>(assetCacheOptions);
+    contentCache = new LRUCache<string, string>(assetCacheOptions);
   }
-  if (options.ttl) {
-    (assetCache as any).ttl = options.ttl;
-  }
-  if (options.maxList) {
-    (listCache as any).max = options.maxList;
-  }
-  if (options.ttlList) {
-    (listCache as any).ttl = options.ttlList;
+  if (options.maxList !== undefined || options.ttlList !== undefined) {
+    listCacheOptions = {
+      ...listCacheOptions,
+      max: options.maxList ?? listCacheOptions.max,
+      ttl: options.ttlList ?? listCacheOptions.ttl,
+    };
+    listCache = new LRUCache<string, AssetMeta[]>(listCacheOptions);
   }
 }

@@ -3,8 +3,8 @@
 > 本地优先的智能体工厂 - 让您像搭乐高一样组合 Skills、MCP、提示词、规则，快速构建、调试、部署个性化智能体。
 
 [![License](https://img.shields.io/badge/license-ISC-blue.svg)](https://opensource.org/licenses/ISC)
-[![Version](https://img.shields.io/badge/version-1.0.0-green.svg)](https://github.com/agentx/releases)
-[![Node.js Version](https://img.shields.io/badge/node-%3E%3D18-brightgreen.svg)](https://nodejs.org)
+[![Version](https://img.shields.io/badge/version-2.0.1-green.svg)](https://github.com/agentx/releases)
+[![Node.js Version](https://img.shields.io/badge/node-%3E%3D20-brightgreen.svg)](https://nodejs.org)
 [![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)](https://github.com/agentx/actions)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-orange.svg)](https://github.com/agentx/pulls)
 
@@ -120,7 +120,7 @@ npm link
 
 #### 系统要求
 
-- **Node.js**: ≥ 18.0.0
+- **Node.js**: ≥ 20.0.0（与 `agentx-mcp/package.json` 的 `engines.node` 一致）
 - **操作系统**: Windows 10+ / macOS 10.15+ / Linux (任何现代发行版)
 - **内存**: 至少 50MB 可用空间（SQLite 数据库 + 资产文件）
 
@@ -173,11 +173,11 @@ AgentX 可以作为 MCP 服务器运行，供 Claude Code 调用。
 
 **配置说明**：
 - `command`: 可以是 `agentx-mcp`（全局安装）或 `node /path/to/dist/index.js`（本地路径）
-- 启动后，Claude Code 会自动发现并调用 AgentX 提供的 33 个工具
+- 启动后，Claude Code 会自动发现并调用 AgentX 注册的全部工具（完整清单以运行时 `tools/list` 为准）
 
 #### 可用工具列表
 
-Claude Code 中可以使用的工具（共 33 个）：
+下列为资产管理工具的基础清单；另有 batch、clone、version、export、dependency、team 等扩展工具，完整清单以运行时 `tools/list` 为准：
 
 **Skills 管理**（5 个）：
 - `list_skills` - 列出所有技能
@@ -423,44 +423,21 @@ workflow: workflows/code-review-flow.yaml
 
 ```
 agentX/
-├── agentx-mcp/              # 主项目（源代码）
-│   ├── src/
-│   │   ├── index.ts         # MCP 服务器入口
-│   │   ├── cli.ts           # CLI 工具入口
-│   │   ├── types.ts         # TypeScript 类型定义
-│   │   ├── cli/             # CLI 命令模块
-│   │   │   ├── commands/    # 子命令实现
-│   │   │   └── format.ts    # 表格格式化
-│   │   ├── tools/           # MCP 工具注册
-│   │   │   ├── skills.ts    # 技能管理工具
-│   │   │   ├── agents.ts    # 智能体管理工具
-│   │   │   ├── prompts.ts   # 提示词管理工具
-│   │   │   ├── rules.ts     # 规则管理工具
-│   │   │   ├── mcps.ts      # MCP 配置工具
-│   │   │   ├── search.ts    # 搜索工具
-│   │   │   └── import.ts    # 导入工具
-│   │   ├── store/           # 数据存储层
-│   │   │   ├── db.ts        # SQLite 初始化
-│   │   │   ├── assets.ts    # 资产 CRUD
-│   │   │   └── search.ts    # 全文搜索
-│   │   └── export/          # 导出功能
-│   │       └── claude.ts    # 导出为 Claude 格式
+├── agentx-mcp/              # 主项目（TypeScript 源码）
+│   ├── src/                 # 入口 index.ts / index-enhanced.ts / cli.ts / types.ts
+│   ├── tests/               # vitest 测试
 │   ├── dist/                # 编译输出
-│   ├── tests/               # 测试文件
-│   ├── package.json         # 项目配置
+│   ├── package.json         # 版本、依赖与 engines（事实以此为准）
 │   └── tsconfig.json        # TypeScript 配置
-├── docs/                    # 项目文档
-│   ├── USER_GUIDE.md       # 用户指南
-│   ├── API_REFERENCE.md    # API 参考
-│   ├── CONFIGURATION.md    # 配置说明
-│   ├── TROUBLESHOOTING.md  # 故障排除
-│   ├── ARCHITECTURE.md     # 架构设计
-│   └── EXAMPLES/           # 示例资产
+├── .github/workflows/       # CI 与发布流水线
+├── docs/                    # API 参考、评审与规划文档
 ├── README.md               # 项目首页（本文件）
+├── AGENTS.md / CLAUDE.md    # 代理与编码准则
 ├── CONTRIBUTING.md         # 贡献指南
-├── CHANGELOG.md            # 版本历史
-└── CLAUDE.md               # 编码准则
+└── CHANGELOG.md            # 版本历史
 ```
+
+`src/` 下的主要模块：`cli/`、`tools/`、`store/`，以及 `api/`、`ai/`、`audit/`、`editor/`、`export/`、`monitoring/`、`observability/`、`orchestrator/`、`plugins/`、`remote/`、`security/`、`sync/`、`templates/`、`types/`、`ui/`、`utils/`、`web/`。完整文件清单以仓库实际目录为准。
 
 ---
 
@@ -488,9 +465,21 @@ npm test
 | 命令 | 说明 |
 |------|------|
 | `npm run build` | 编译 TypeScript 到 `dist/` 目录 |
+| `npm run typecheck` | 类型检查（`tsc --noEmit`） |
+| `npm run lint` | ESLint 静态检查 |
 | `npm start` | 运行 MCP 服务器 |
-| `npm test` | 运行单元测试 |
+| `npm test` | 运行单元测试（vitest） |
 | `npm run build && npm start` | 构建后启动 |
+
+### 增强模式（可选）
+
+设置 `AGENTX_ENHANCED=true` 后，MCP 服务器会懒加载一组增强模块；不设置时这些模块不会启动。也可使用 `npm run start:enhanced`（Windows 下为 `set AGENTX_ENHANCED=true && ...`）。
+
+额外能力：REST API（`/health`、`/api/assets`、`/api/stats`、`/api/cache/stats` 等）、监控面板、云同步、AI 助手、插件加载、可视化工作流编辑器、移动端 UI 与运行时缓存统计。
+
+相关环境变量：`AGENTX_API_PORT`（默认 3000）、`AGENTX_API_HOST`（默认 localhost）、`AGENTX_API_KEY`（启用 REST 认证）、`AGENTX_MONITOR_INTERVAL`（默认 5000ms）。
+
+> 注意：`/api/workflows/execute` 目前返回 `status: not_implemented`，尚未接入真实执行引擎。
 
 ### 代码规范
 

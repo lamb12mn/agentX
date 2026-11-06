@@ -1,6 +1,6 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
-import { execSync } from 'child_process';
+import { execFileSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 
@@ -15,7 +15,12 @@ export function registerInitCommand(program: Command) {
         .option('--depth <number>', 'Clone depth', '1')
         .action(async (template = 'basic-mcp-server', options) => {
             const targetDir = path.resolve(process.cwd(), options.dir);
-            const depth = options.depth;
+            // Always coerce to a positive integer so the value cannot carry shell syntax
+            const depth = Number(options.depth);
+            if (!Number.isInteger(depth) || depth < 1) {
+                console.error(chalk.red(`Invalid --depth value: ${options.depth}`));
+                process.exit(1);
+            }
 
             // Template repository mapping
             const repos: Record<string, string> = {
@@ -37,7 +42,8 @@ export function registerInitCommand(program: Command) {
 
             console.log(chalk.blue(`Cloning template '${template}' into ${targetDir}...`));
             try {
-                execSync(`git clone --depth ${depth} ${repoUrl} ${targetDir}`, { stdio: 'inherit' });
+                // Argument array (no shell) so paths/URLs with spaces or metacharacters stay inert
+                execFileSync('git', ['clone', '--depth', String(depth), repoUrl, targetDir], { stdio: 'inherit' });
                 // Remove .git folder to detach from template repo
                 const gitDir = path.join(targetDir, '.git');
                 if (fs.existsSync(gitDir)) {

@@ -24,6 +24,8 @@ jobs:
         run: cd agentx-mcp && npm run build
       - name: Test
         run: cd agentx-mcp && npm test
+      - name: Verify documentation consistency
+        run: node scripts/verify-docs.mjs
       - name: Publish
         run: cd agentx-mcp && npm publish --access public
         env:

@@ -63,3 +63,91 @@
 **这些准则起效的标准是：** diff 中少了不必要的修改、少了因过度复杂而重写、澄清问题在错误之前而不是之后出现。
 
 ---
+
+<!-- CODEGRAPH_START -->
+## CodeGraph
+
+本项目已建立 `.codegraph/` 索引。需要理解或定位代码时，优先用 CodeGraph，不要先 grep 或逐个读文件：
+
+- **MCP 工具**（可用时）：`codegraph_explore` 一次调用返回相关符号的逐行源码、调用链（含 grep 追不到的动态派发跳转）和影响面；查询里给出文件名或符号名即可读取其当前源码。若工具被延迟加载，按名称搜索加载。
+- **命令行**（始终可用）：`codegraph explore "<符号名或问题>"` 输出相同内容。
+
+若项目不存在 `.codegraph/` 目录，完全跳过 CodeGraph —— 是否建索引由用户决定。
+<!-- CODEGRAPH_END -->
+
+---
+
+## CodeGraph 速查（本仓库）
+
+### 环境现状
+
+- CLI：`@colbymchenry/codegraph` v1.6.2，全局安装，命令在 PATH 中。
+- 索引：`.codegraph/codegraph.db`（本地 SQLite，已被 `.gitignore` 忽略）；文件监听约 1 秒自动同步。
+- CodeBuddy MCP：用户级 `~/.codebuddy/mcp.json` 的 `codegraph` 条目 → `codegraph serve --mcp`；`env.CODEGRAPH_MCP_TOOLS` 放开全部 8 个工具（需重启 IDE 生效）。已实测 `codegraph_explore` 无需 `--path` / `projectPath` 即可定位本仓库索引。
+- 其它 Agent：`codegraph install --target=all --yes` 已接线（Claude Code、Cursor、Codex CLI、opencode、Hermes、Gemini CLI、Antigravity、Kiro、Copilot 三形态），需各自重启；Kiro 还需在设置里启用 MCP。
+- 索引配置：项目根 `codegraph.json`，含 `exclude` / `include` / `includeIgnored` / `extensions` 四字段，当前均为空值，等价于零配置；改动后必须 `codegraph index`。
+
+以上为安装时的快照，版本或接线变化后需同步更新本节。
+
+### MCP 工具（8 个）
+
+`CODEGRAPH_MCP_TOOLS` 是**替换式白名单**，不是追加，配置时必须列全：`explore,node,search,callers,callees,impact,files,status`。
+
+- `explore`：主力，源码 + 调用链 + 影响面（几乎任何问题先调它）。
+- `node`：单符号源码与调用/被调用链，或按行读取整个文件。
+- `search`：按名查符号，只返回位置。
+- `callers` / `callees` / `impact`：谁调用它 / 它调用谁 / 改动影响面。
+- `files`：索引中的文件结构。
+- `status`：索引健康与统计。
+
+对应的 CLI 等价命令：`explore` / `node` / `query` / `callers` / `callees` / `impact` / `files` / `status`。
+
+### 命令
+
+```bash
+codegraph version
+codegraph upgrade [version]             # 自动 refresh 已接线的 Agent
+codegraph install --yes [--init]
+codegraph install --target=all --yes
+codegraph install --print-config <id>   # 只打印配置，不写文件
+codegraph uninstall                     # 撤销所有 Agent 接线，保留 .codegraph/
+
+codegraph init [path]                   # 初始化并建全量索引
+codegraph index [path]                  # 全量重建（改 codegraph.json 后必跑）
+codegraph sync [path]                   # 增量同步
+codegraph status [-j]                   # 状态与统计
+codegraph uninit [path]                 # 删除 .codegraph/
+
+codegraph explore <query...>            # 主力查询
+codegraph context <task...>             # 为任务组装上下文
+codegraph node [name] / query <search> / callers <symbol> / callees <symbol>
+codegraph impact <symbol> / affected [files...] / files
+
+codegraph serve --mcp [--path <dir>] [--no-watch]
+codegraph daemon                        # 管理后台守护进程
+codegraph unlock [path]                 # 清除陈旧锁文件
+codegraph telemetry status|on|off
+```
+
+### 排错
+
+- `Not initialized` → `codegraph init`。
+- 索引落后，或改了 `codegraph.json` → `codegraph sync` / `codegraph index`。
+- 锁文件阻塞 → `codegraph unlock`；守护进程卡住 → `codegraph daemon`。
+- MCP 列不出工具 → 该项目没有 `.codegraph/`，先 `init`（无索引时 server 会声明 inactive）。
+- MCP 报找不到项目 → 在 `args` 末尾补 `--path`, `E:/AI/mcp/agentX`（代价是全局配置绑定单项目），或在工具调用里传 `projectPath`。
+
+### 索引配置字段
+
+`codegraph.json` 为空时等价于零配置；有需求时按下列字段填写，改完必须 `codegraph index`：
+
+```json
+{
+  "exclude": ["static/", "**/vendor/**"],
+  "include": ["Tools/", "Local/typescript/"],
+  "includeIgnored": ["packages/", "services/"],
+  "extensions": {".dota_lua": "lua", ".tpl": "php"}
+}
+```
+
+`exclude` 强制排除已跟踪目录；`include` 把 `.gitignore` 忽略的一手源码拉回索引；`includeIgnored` 索引被忽略目录里的嵌套 git 仓库；`extensions` 映射非标准扩展名。默认跳过 `node_modules` / `dist` / `vendor` 等目录、`.gitignore` 内容、大于 1 MB 的文件。

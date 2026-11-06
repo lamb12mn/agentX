@@ -20,6 +20,7 @@ import { registerExportTools } from './tools/export.js';
 import { registerDependencyTools } from './tools/dependencies.js';
 import { registerTeamTools } from './tools/teams.js';
 import { initTracing, traceToolCall } from './observability/index.js';
+import { diag } from './observability/diag.js';
 import { formatError, ErrorCode } from './utils/errors.js';
 import { CredentialVault } from './security/index.js';
 
@@ -84,7 +85,7 @@ if (ENHANCED) {
   const apiKey = process.env.AGENTX_API_KEY;
   if (apiKey) {
     restApi.addAuthMiddleware(apiKey);
-    console.log('REST API authentication enabled');
+    diag('REST API authentication enabled');
   } else {
     console.warn('REST API authentication disabled — set AGENTX_API_KEY to enable');
   }
@@ -392,7 +393,7 @@ if (ENHANCED && getCacheStats && clearAssetCache && getSystemStats && pluginLoad
   Object.assign(allTools, enhancedTools);
 }
 
-const SERVER_VERSION = '2.0.0';
+const SERVER_VERSION = '2.0.1';
 
 const server = new Server(
   { name: 'agentx', version: SERVER_VERSION },
@@ -448,17 +449,17 @@ async function initializeEnhancedModules(): Promise<void> {
     return;
   }
 
-  console.log('Initializing enhanced modules...');
+  diag('Initializing enhanced modules...');
 
   try {
     await pluginLoader.loadAll();
-    console.log(`Loaded ${pluginLoader.getAllPlugins().length} plugins`);
+    diag(`Loaded ${pluginLoader.getAllPlugins().length} plugins`);
   } catch (error) {
     console.warn('Failed to load plugins:', error);
   }
 
   monitoringDashboard.start();
-  console.log('Monitoring dashboard started');
+  diag('Monitoring dashboard started');
 
   // Setup event listeners
   pluginLoader.on('pluginLoaded', (name) => {
@@ -490,12 +491,12 @@ async function main(): Promise<void> {
   initTracing();
 
   if (ENHANCED) {
-    console.log('Starting AgentX MCP Server v2.0 (enhanced)...');
+    diag('Starting AgentX MCP Server v2.0 (enhanced)...');
     await initializeEnhancedModules();
     if (restApi) {
       try {
         await restApi.start();
-        console.log(`REST API server started on port ${process.env.AGENTX_API_PORT ?? '3000'}`);
+        diag(`REST API server started on port ${process.env.AGENTX_API_PORT ?? '3000'}`);
       } catch (error) {
         console.warn('Failed to start REST API:', error);
       }
@@ -505,10 +506,11 @@ async function main(): Promise<void> {
   const transport = new StdioServerTransport();
   await server.connect(transport);
 
-  console.log(`AgentX MCP Server v2.0 running${ENHANCED ? ' (enhanced)' : ''}`);
+  // Diagnostics go to stderr — stdout belongs to the MCP JSON-RPC stream.
+  diag(`AgentX MCP Server v2.0 running${ENHANCED ? ' (enhanced)' : ''}`);
   if (ENHANCED) {
-    console.log(`Base directory: ${baseDir}`);
-    console.log(`Total tools available: ${Object.keys(allTools).length}`);
+    diag(`Base directory: ${baseDir}`);
+    diag(`Total tools available: ${Object.keys(allTools).length}`);
   }
 }
 
