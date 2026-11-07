@@ -101,11 +101,6 @@ function buildChildEnv(extraVars?: Record<string, string>): Record<string, strin
     Object.assign(base, extraVars);
   }
 
-  // Apply Node.js memory limit
-  const maxMem = envInt(ENV_MAX_MEMORY, DEFAULT_MAX_MEMORY_MB);
-  // Let the caller override maxMemory via options, but also respect env var
-  // The memory limit will be handled via NODE_OPTIONS below
-
   return base;
 }
 

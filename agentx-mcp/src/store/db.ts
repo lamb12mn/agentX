@@ -2,6 +2,7 @@ import Database from 'better-sqlite3';
 import { mkdirSync } from 'fs';
 import { dirname } from 'path';
 import { ensureExecutionTables } from './executions.js';
+import { ensureEvaluationTables } from './evaluations.js';
 
 let db: Database.Database | undefined;
 
@@ -92,6 +93,9 @@ export function initDb(dbPath: string): void {
 
   // 初始化执行会话表（幂等）
   ensureExecutionTables();
+
+  // 初始化 Prompt 评测表（幂等）
+  ensureEvaluationTables();
 }
 
 /** 获取数据库实例，未初始化时抛出错误 */

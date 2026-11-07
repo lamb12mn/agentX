@@ -11,6 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - README: 统一快速开始中 MCP 配置示例，添加 args 和 env 字段
 - CI: 固定 GitHub Actions 第三方 action 版本为 commit SHA，防止供应链攻击
+- 文档与实现对齐：README / CONTRIBUTING / API_REFERENCE 按当前源码同步（65 个基础工具 + 38 个增强工具、25 个 CLI 命令、7 种资产类型、Node ≥20、`src/types.ts`、实际存储路径与错误码）
+- docs: 移除指向不存在文档的链接，重建被自动生成脚本写坏的 `docs/API_REFERENCE.md`，补入原生模块 ABI 排障说明
+- scripts: 扩展 `verify-docs.mjs`，校验版本徽章、工具/命令数量与本地文档链接
 
 ### Security
 
@@ -239,7 +242,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## 版本说明
 
-### 1.0.0 (当前版本)
+### 1.0.0（首个稳定版本，历史记录）
 
 **首次正式发布**，包含 Phase 1-8 所有核心功能：
 

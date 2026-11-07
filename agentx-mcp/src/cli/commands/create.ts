@@ -32,7 +32,8 @@ export function registerCreateCommand(program: Command): void {
     .action(withDb(async (options: CreateOptions) => {
       const baseDir = getBaseDir();
 
-      let { type, name, content, description, tags, interactive } = options;
+      const { name, content, description, tags, interactive } = options;
+      let { type } = options;
 
       // Validate type
       if (!VALID_TYPES.includes(type as AssetType)) {
@@ -108,7 +109,7 @@ export function registerCreateCommand(program: Command): void {
 
       // Create asset based on type
       try {
-        let assetContent = finalContent;
+        const assetContent = finalContent;
 
         // For mcp/agent types, validate YAML
         if ((type === 'mcp' || type === 'agent' || type === 'workflow') && finalContent) {

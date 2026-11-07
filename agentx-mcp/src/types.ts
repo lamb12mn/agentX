@@ -144,3 +144,9 @@ export interface ImportResult {
   /** 错误信息列表 */
   errors: string[];
 }
+
+/** Prompt 评测模式：1-5 分评分或 GSB 比较 */
+export type EvaluationMode = 'score' | 'gsb';
+
+/** GSB 比较判定（模型回答相对参照回答） */
+export type GsbVerdict = 'good' | 'same' | 'bad';

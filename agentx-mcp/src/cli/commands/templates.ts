@@ -1,6 +1,5 @@
 import type { Command } from 'commander';
-import { listTemplates, getTemplate, getTemplatesByType } from '../../templates/index.js';
-import { formatTable } from '../format.js';
+import { listTemplates, getTemplatesByType } from '../../templates/index.js';
 import chalk from 'chalk';
 import type { AssetType } from '../../types.js';
 

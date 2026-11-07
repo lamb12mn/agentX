@@ -16,6 +16,7 @@ import { registerImportTools } from './tools/import.js';
 import { registerBatchTools } from './tools/batch.js';
 import { registerCloneTools } from './tools/clone.js';
 import { registerVersionTools } from './tools/versions.js';
+import { registerEvaluationTools } from './tools/evaluations.js';
 import { registerExportTools } from './tools/export.js';
 import { registerDependencyTools } from './tools/dependencies.js';
 import { registerTeamTools } from './tools/teams.js';
@@ -103,6 +104,7 @@ const importTools = registerImportTools(baseDir);
 const batchTools = registerBatchTools(baseDir);
 const cloneTools = registerCloneTools(baseDir);
 const versionTools = registerVersionTools();
+const evaluationTools = registerEvaluationTools();
 const exportTools = registerExportTools(baseDir);
 const dependencyTools = registerDependencyTools();
 const teamTools = registerTeamTools(baseDir);
@@ -119,6 +121,7 @@ const allTools: Record<string, AnyHandler> = {
   ...(batchTools as unknown as Record<string, AnyHandler>),
   ...(cloneTools as unknown as Record<string, AnyHandler>),
   ...(versionTools as unknown as Record<string, AnyHandler>),
+  ...(evaluationTools as unknown as Record<string, AnyHandler>),
   ...(exportTools as unknown as Record<string, AnyHandler>),
   ...(dependencyTools as unknown as Record<string, AnyHandler>),
   ...(teamTools as unknown as Record<string, AnyHandler>),

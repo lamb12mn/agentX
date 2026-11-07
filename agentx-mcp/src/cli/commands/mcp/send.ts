@@ -57,7 +57,7 @@ export function registerMcpSend(mcp: Command) {
                 try {
                     const response = JSON.parse(responseData);
                     console.log(JSON.stringify(response, null, 2));
-                } catch (e) {
+                } catch {
                     console.error(chalk.red('Failed to parse response:'), responseData);
                     process.exit(1);
                 }

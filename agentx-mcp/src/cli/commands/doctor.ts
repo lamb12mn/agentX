@@ -237,11 +237,11 @@ async function handleDefault(): Promise<void> {
   try {
     execSync('pnpm --version', { stdio: 'ignore' });
     pkgManager = 'pnpm';
-  } catch(e) {}
+  } catch {}
   try {
     execSync('yarn --version', { stdio: 'ignore' });
     pkgManager = 'yarn';
-  } catch(e) {}
+  } catch {}
   console.log(chalk.green('✅ 包管理器:'), pkgManager);
 
   // 3. 检查项目依赖
@@ -282,7 +282,7 @@ async function handleDefault(): Promise<void> {
     try {
       fs.accessSync(fullPath, fs.constants.W_OK);
       console.log(chalk.green(`✅ 目录可写: ${dir}`));
-    } catch(e) {
+    } catch {
       console.log(chalk.red(`❌ 目录不可写: ${dir}`));
       hasError = true;
     }
@@ -296,7 +296,7 @@ async function handleDefault(): Promise<void> {
     } else {
       console.log(chalk.yellow('⚠️ Git 工作区有未提交的更改'));
     }
-  } catch(e) {
+  } catch {
     console.log(chalk.yellow('⚠️ 未检测到 Git 仓库'));
   }
 

@@ -1,7 +1,7 @@
 import { createWriteStream } from 'fs';
 import { mkdir } from 'fs/promises';
 import { join, dirname } from 'path';
-import { getAsset, listAssets, readAssetContent } from '../store/assets.js';
+import { listAssets, readAssetContent } from '../store/assets.js';
 import archiver from 'archiver';
 
 /**

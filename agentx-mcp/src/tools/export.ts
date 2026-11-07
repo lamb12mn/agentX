@@ -2,9 +2,9 @@ import { getAsset, readAssetContent, listAssets } from '../store/assets.js';
 import { exportAgent } from '../export/claude.js';
 import { exportAsZip, exportAsJson, exportAsYaml } from '../utils/zip.js';
 import { logAudit } from '../audit/index.js';
-import type { AgentConfig, AssetType } from '../types.js';
+import type { AgentConfig } from '../types.js';
 import yaml from 'js-yaml';
-import { createError, ErrorCode } from '../utils/errors.js';
+import { createError } from '../utils/errors.js';
 import { getBaseDir } from '../cli/common.js';
 
 /**
@@ -16,7 +16,7 @@ import { getBaseDir } from '../cli/common.js';
  * @param baseDir - Base directory for asset file storage
  * @returns Export tool handlers map
  */
-export function registerExportTools(baseDir: string) {
+export function registerExportTools(_baseDir: string) {
   return {
     export_agent: {
       description: 'Export an agent to CLAUDE.md + settings.json format for Claude Code',
@@ -98,7 +98,7 @@ export function registerExportTools(baseDir: string) {
         },
         description: 'Export all assets. Format "claude" exports agents only to CLAUDE.md format. Other formats export all assets.',
       },
-      handler: async ({ format = 'claude', type, output }: { format?: string; type?: string; output?: string }) => {
+      handler: async ({ format = 'claude', output }: { format?: string; type?: string; output?: string }) => {
         const baseDir = getBaseDir();
 
         if (format === 'claude') {
@@ -121,7 +121,7 @@ export function registerExportTools(baseDir: string) {
                 details: `Failed to parse agent ${asset.name}: ${String(err)}`,
               });
             }
-            const result = await exportAgent(config, outputDir);
+            await exportAgent(config, outputDir);
             results.push(asset.name);
           }
 

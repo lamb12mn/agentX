@@ -352,7 +352,7 @@ export class VisualWorkflowEditor {
    * 更新节点的连接线
    */
   private updateConnectionsForNode(nodeId: string): void {
-    this.connections.forEach((conn, connId) => {
+    this.connections.forEach((conn, _connId) => {
       if (conn.from === nodeId || conn.to === nodeId) {
         const fromNode = this.nodes.get(conn.from);
         const toNode = this.nodes.get(conn.to);
@@ -430,7 +430,7 @@ export class VisualWorkflowEditor {
       });
       
       // 更新位置
-      positions.forEach((pos, id) => {
+      positions.forEach((pos, _id) => {
         pos.vx *= damping;
         pos.vy *= damping;
         pos.x += pos.vx;

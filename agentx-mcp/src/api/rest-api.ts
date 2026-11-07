@@ -1,9 +1,12 @@
 import { EventEmitter } from 'events';
+import { createServer, Server, IncomingMessage, ServerResponse } from 'http';
+import { timingSafeEqual } from 'crypto';
 
 import { listAssets, getAsset, createAsset, updateAsset, deleteAsset, batchDeleteAssets, batchAddTags, batchRemoveTags } from '../store/assets.js';
 import { getStats } from '../store/pagination.js';
 import { getCacheStats } from '../store/cache.js';
 import { getBaseDir } from '../cli/common.js';
+import { diag } from '../observability/diag.js';
 
 /** REST API 服务器配置 */
 export interface APIConfig {
@@ -34,6 +37,8 @@ export interface APIResponse<T = any> {
   error?: string;
   /** 提示信息 */
   message?: string;
+  /** HTTP 状态码（由 HTTP 层使用，缺省 200/500） */
+  statusCode?: number;
 }
 
 /** REST API 请求格式 */
@@ -55,14 +60,25 @@ export interface Middleware {
   (req: APIRequest, res: APIResponse, next: () => void): void;
 }
 
+/** 路由处理函数签名 */
+export type RouteHandler = (req: APIRequest) => unknown | Promise<unknown>;
+
+/** 去除 Bearer 前缀（如存在） */
+function stripBearer(value: string): string {
+  return value.startsWith('Bearer ') ? value.slice('Bearer '.length) : value;
+}
+
 /** REST API 服务器 */
 export class RESTAPI extends EventEmitter {
   private config: APIConfig;
-  private routes: Map<string, Map<string, Function>> = new Map();
+  private routes: Map<string, Map<string, RouteHandler>> = new Map();
   private middlewares: Middleware[] = [];
   private isRunning: boolean = false;
   private requestCount: number = 0;
   private windowStart: number = Date.now();
+  private server: Server | null = null;
+  /** 请求体大小上限（1MB），防止内存耗尽 */
+  private static readonly MAX_BODY_BYTES = 1024 * 1024;
 
   constructor(config: Partial<APIConfig> = {}) {
     super();
@@ -86,19 +102,35 @@ export class RESTAPI extends EventEmitter {
       throw new Error('API server is already running');
     }
 
-    // 注册认证中间件（如果配置了 API key）
-    const apiKey = this.config.apiKey || process.env.AGENTX_API_KEY;
-    if (apiKey) {
-      this.addAuthMiddleware(apiKey);
-    }
-
     // 注册默认路由
     this.registerDefaultRoutes();
 
+    // 注册认证中间件（如配置了 API key 且尚未在外部注册）
+    const apiKey = this.config.apiKey || process.env.AGENTX_API_KEY;
+    if (apiKey && !this.isAuthEnabled()) {
+      this.addAuthMiddleware(apiKey);
+    }
+
+    // 真正监听端口：此前 start() 只翻转标志位，api.start 属于假实现
+    await new Promise<void>((resolve, reject) => {
+      const server = createServer((req, res) => {
+        this.handleHttp(req, res).catch(() => {
+          if (!res.headersSent) res.writeHead(500, { 'content-type': 'application/json' });
+          res.end(JSON.stringify({ success: false, error: 'Internal Server Error' }));
+        });
+      });
+      server.once('error', reject);
+      server.listen(this.config.port, this.config.host, () => {
+        server.removeListener('error', reject);
+        this.server = server;
+        resolve();
+      });
+    });
+
     this.isRunning = true;
     this.emit('start', { port: this.config.port, host: this.config.host });
-    
-    console.log(`REST API server started on http://${this.config.host}:${this.config.port}`);
+
+    diag(`REST API server started on http://${this.config.host}:${this.config.port}`);
   }
 
   /**
@@ -106,14 +138,19 @@ export class RESTAPI extends EventEmitter {
    */
   async stop(): Promise<void> {
     this.isRunning = false;
+    if (this.server) {
+      const server = this.server;
+      this.server = null;
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
     this.emit('stop');
-    console.log('REST API server stopped');
+    diag('REST API server stopped');
   }
 
   /**
    * 注册路由
    */
-  registerRoute(method: string, path: string, handler: Function): void {
+  registerRoute(method: string, path: string, handler: RouteHandler): void {
     const normalizedMethod = method.toUpperCase();
     
     if (!this.routes.has(normalizedMethod)) {
@@ -140,16 +177,36 @@ export class RESTAPI extends EventEmitter {
     if (!this.checkRateLimit()) {
       return {
         success: false,
+        statusCode: 429,
         error: 'Rate limit exceeded',
         message: 'Too many requests, please try again later',
       };
     }
 
-    // 执行中间件
+    // 执行中间件：中间件通过填充 res 并跳过 next() 来短路请求
     for (const middleware of this.middlewares) {
-      await new Promise<void>((resolve, _reject) => {
-        middleware(req, {} as APIResponse, () => resolve());
+      const res: APIResponse = { success: true };
+      let continued = false;
+      await new Promise<void>((resolve) => {
+        middleware(req, res, () => {
+          continued = true;
+          resolve();
+        });
+        // 中间件未调用 next() 即短路（如鉴权失败），必须手动释放 Promise，否则会挂死
+        if (!continued) resolve();
       });
+      if (!continued) {
+        if (res.success) {
+          // 中间件已生成完整响应（如 CORS 预检）
+          return res;
+        }
+        return {
+          success: false,
+          statusCode: res.statusCode ?? 401,
+          error: res.error ?? 'Unauthorized',
+          ...(res.message ? { message: res.message } : {}),
+        };
+      }
     }
 
     // 查找匹配的路由
@@ -158,6 +215,7 @@ export class RESTAPI extends EventEmitter {
     if (!handler) {
       return {
         success: false,
+        statusCode: 404,
         error: 'Not Found',
         message: `No route found for ${req.method} ${req.path}`,
       };
@@ -167,11 +225,13 @@ export class RESTAPI extends EventEmitter {
       const result = await handler(req);
       return {
         success: true,
+        statusCode: 200,
         data: result,
       };
     } catch (error) {
       return {
         success: false,
+        statusCode: 500,
         error: 'Internal Server Error',
         message: error instanceof Error ? error.message : String(error),
       };
@@ -181,7 +241,7 @@ export class RESTAPI extends EventEmitter {
   /**
    * 查找处理程序
    */
-  private findHandler(method: string, path: string): Function | null {
+  private findHandler(method: string, path: string): RouteHandler | null {
     const normalizedMethod = method.toUpperCase();
     const methodRoutes = this.routes.get(normalizedMethod);
     
@@ -357,7 +417,7 @@ export class RESTAPI extends EventEmitter {
    */
   addCorsMiddleware(): void {
     this.use((_req, _res, next) => {
-      // 在实际实现中，这里会设置CORS头
+      // CORS 响应头由 HTTP 层（sendHttp）在 config.cors 开启时统一设置
       next();
     });
   }
@@ -367,29 +427,121 @@ export class RESTAPI extends EventEmitter {
    */
   addLoggingMiddleware(): void {
     this.use((req, _res, next) => {
-      console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
+      diag(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
       next();
     });
   }
 
   /**
    * 添加身份验证中间件
-   * @param apiKey 预期的 API key（Bearer token）
+   * @param apiKey 预期的 API key（Authorization: Bearer 或 X-API-Key 头）
    * @param publicPaths 不需要认证的路径前缀列表
    */
   addAuthMiddleware(apiKey: string, publicPaths: string[] = ['/health']): void {
-    this.use((req, _res, next) => {
+    this.use((req, res, next) => {
       // 公开路径跳过认证
       if (publicPaths.some(p => req.path.startsWith(p))) {
         next();
         return;
       }
-      const authHeader = req.headers['authorization'];
-      if (!authHeader || authHeader !== `Bearer ${apiKey}`) {
-        throw new Error('Unauthorized');
+      // remote 客户端使用 X-API-Key，REST 调用方常用 Bearer token，两者都接受
+      const provided = req.headers['x-api-key'] ?? req.headers['authorization'] ?? '';
+      if (!this.secureCompare(provided, apiKey) && !this.secureCompare(stripBearer(provided), apiKey)) {
+        res.success = false;
+        res.statusCode = 401;
+        res.error = 'Unauthorized';
+        return;
       }
       next();
     });
+  }
+
+  /** timing-safe 字符串比较，避免旁路时序泄露 */
+  private secureCompare(a: string, b: string): boolean {
+    const bufA = Buffer.from(String(a));
+    const bufB = Buffer.from(String(b));
+    if (bufA.length !== bufB.length) return false;
+    return timingSafeEqual(bufA, bufB);
+  }
+
+  /**
+   * HTTP 层：将 node:http 请求映射为 APIRequest / APIResponse
+   */
+  private async handleHttp(req: IncomingMessage, res: ServerResponse): Promise<void> {
+    if (this.config.cors) {
+      res.setHeader('access-control-allow-origin', '*');
+      res.setHeader('access-control-allow-methods', 'GET,POST,PUT,DELETE,OPTIONS');
+      res.setHeader('access-control-allow-headers', 'content-type,authorization,x-api-key');
+      if (req.method === 'OPTIONS') {
+        res.writeHead(204);
+        res.end();
+        return;
+      }
+    }
+
+    const url = new URL(req.url ?? '/', `http://${req.headers.host ?? this.config.host}`);
+    let body: unknown = {};
+    if (req.method !== 'GET' && req.method !== 'HEAD') {
+      body = await this.readBody(req);
+      if (body === null) {
+        this.sendHttp(res, { success: false, statusCode: 413, error: 'Payload too large' });
+        return;
+      }
+    }
+
+    const headers: Record<string, string> = {};
+    for (const [key, value] of Object.entries(req.headers)) {
+      if (typeof value === 'string') headers[key.toLowerCase()] = value;
+      else if (Array.isArray(value)) headers[key.toLowerCase()] = value.join(',');
+    }
+
+    const query: Record<string, string> = {};
+    for (const [key, value] of url.searchParams.entries()) query[key] = value;
+
+    const apiRes = await this.handleRequest({
+      method: req.method ?? 'GET',
+      path: url.pathname,
+      query,
+      body,
+      headers,
+    });
+    this.sendHttp(res, apiRes);
+  }
+
+  /** 读取并限制请求体大小；超限返回 null */
+  private readBody(req: IncomingMessage): Promise<unknown | null> {
+    return new Promise((resolve) => {
+      const chunks: Buffer[] = [];
+      let size = 0;
+      req.on('data', (chunk: Buffer) => {
+        size += chunk.length;
+        if (size > RESTAPI.MAX_BODY_BYTES) {
+          req.removeAllListeners();
+          resolve(null);
+          return;
+        }
+        chunks.push(chunk);
+      });
+      req.on('end', () => {
+        const raw = Buffer.concat(chunks).toString('utf8');
+        if (!raw) {
+          resolve({});
+          return;
+        }
+        try {
+          resolve(JSON.parse(raw));
+        } catch {
+          resolve({ raw });
+        }
+      });
+      req.on('error', () => resolve({}));
+    });
+  }
+
+  private sendHttp(res: ServerResponse, apiRes: APIResponse): void {
+    const status = apiRes.statusCode ?? (apiRes.success ? 200 : 500);
+    res.writeHead(status, { 'content-type': 'application/json' });
+    res.end(JSON.stringify(apiRes));
   }
 
   /**

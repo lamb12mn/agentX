@@ -3,12 +3,7 @@ import { join, dirname, basename } from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { getDb } from './db.js';
 import { indexAssetContent } from './search.js';
-import {
-  removeDependenciesForAsset,
-  getDependents as getDependentsFromDeps,
-  getDependencies as getDependenciesFromDeps,
-  detectCircularDependency as detectCircularFromDeps,
-} from './dependencies.js';
+import { removeDependenciesForAsset } from './dependencies.js';
 import type { AssetMeta, AssetType } from '../types.js';
 import {
   getAssetFromCache,
@@ -18,12 +13,10 @@ import {
   setContentInCache,
   getListFromCache,
   setListInCache,
-  getPaginatedFromCache,
-  setPaginatedInCache,
   invalidateListCache,
   getCacheStats,
 } from './cache.js';
-import { getAssetsPaginated, getStats, streamAssets } from './pagination.js';
+import { getStats, streamAssets } from './pagination.js';
 import chalk from 'chalk';
 
 /**

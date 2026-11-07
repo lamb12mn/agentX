@@ -3,7 +3,7 @@ import { join, basename, extname } from 'path';
 import { homedir } from 'os';
 import { createAsset, listAssets } from '../store/assets.js';
 import { logAudit } from '../audit/index.js';
-import type { AssetMeta, AssetType, ImportResult } from '../types.js';
+import type { AssetType, ImportResult } from '../types.js';
 
 export type { ImportResult };
 

@@ -172,7 +172,7 @@ describe('batch operations', () => {
     it('removes multiple tags', async () => {
       const a1 = await createAsset({ type: 'skill', name: 'skill1', tags: ['a', 'b', 'c', 'd'] }, 'content1', testBaseDir);
 
-      const result = await batchRemoveTags([a1.id], ['a', 'c']);
+      await batchRemoveTags([a1.id], ['a', 'c']);
 
       const updated = await getAsset(a1.id);
       expect(updated!.tags).toEqual(['b', 'd']);

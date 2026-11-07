@@ -194,7 +194,7 @@ const errorMessages: Record<ErrorCodeType, { message: string; suggestion: string
 export function formatError(error: Error | string, context?: ErrorContext): string {
   let code: ErrorCodeType;
   let message = '';
-  let details: string[] = [];
+  const details: string[] = [];
 
   // Extract error code from error message or use default
   if (typeof error === 'string') {

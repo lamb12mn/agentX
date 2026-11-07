@@ -144,7 +144,13 @@ export class CredentialVault {
     }
     try {
       // keytar is a CJS native module — use namespace import for compatibility
-      const keytar = await import('keytar') as { default?: KeychainBackend; setPassword: Function; getPassword: Function; deletePassword: Function; findCredentials: Function };
+      const keytar = await import('keytar') as {
+        default?: KeychainBackend;
+        setPassword: (service: string, account: string, password: string) => Promise<void>;
+        getPassword: (service: string, account: string) => Promise<string | null>;
+        deletePassword: (service: string, account: string) => Promise<boolean>;
+        findCredentials: (service: string) => Promise<Array<{ account: string; password: string }>>;
+      };
       const impl = keytar.default ?? keytar;
       return {
         setPassword: impl.setPassword.bind(impl),

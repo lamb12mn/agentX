@@ -1,7 +1,5 @@
 import { createAsset, getAsset, listAssets, updateAsset, deleteAsset } from '../store/assets.js';
 import type { AssetMeta } from '../types.js';
-import { validateCreateAssetInput, validateUpdateAssetInput, validateDeleteAssetInput, formatValidationResult } from '../utils/validation.js';
-import { formatError } from '../utils/errors.js';
 
 /**
  * Handler interface for MCP tool registration

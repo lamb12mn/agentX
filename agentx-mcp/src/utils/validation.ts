@@ -3,7 +3,6 @@
  * Provides input validation with enhanced user feedback
  */
 
-import type { AssetType } from '../types.js';
 import { validateAssetName, validateAssetType } from './errors.js';
 
 /**

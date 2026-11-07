@@ -1,5 +1,4 @@
 import { EventEmitter } from 'events';
-import type { AssetMeta } from '../types.js';
 
 /**
  * Configuration for the monitoring dashboard

@@ -1,4 +1,3 @@
-import { z } from 'zod';
 import {
   createVersionSnapshot,
   listVersions,
@@ -7,7 +6,6 @@ import {
   clearVersions,
   getVersionStats,
 } from '../store/versions.js';
-import { getAsset } from '../store/assets.js';
 import type { ToolHandler } from './common.js';
 
 /**

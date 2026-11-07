@@ -1,5 +1,4 @@
 import { getDb } from './db.js';
-import type { AssetMeta } from '../types.js';
 
 /**
  * 依赖管理模块
@@ -111,8 +110,6 @@ export function getDependencyGraph(assetId: string): DependencyInfo[] {
  * 检测循环依赖（从指定资产开始DFS）
  */
 export function detectCircularDependency(assetId: string, visited: Set<string> = new Set()): boolean {
-  const db = getDb();
-
   if (visited.has(assetId)) {
     return true; // 发现循环
   }

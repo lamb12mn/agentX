@@ -1,8 +1,7 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
 import fs from 'fs';
-import path from 'path';
-import { getAsset, listAssets, getDependents } from '../../store/assets.js';
+import { getAsset } from '../../store/assets.js';
 
 /**
  * Register the `graph` command — generate dependency graph in DOT format

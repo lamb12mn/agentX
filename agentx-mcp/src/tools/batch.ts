@@ -23,7 +23,7 @@ interface BatchTagInput {
  * @param baseDir - Base directory for asset file storage
  * @returns Batch tool handlers map
  */
-export function registerBatchTools(baseDir: string): {
+export function registerBatchTools(_baseDir: string): {
   batch_delete: ToolHandler<BatchDeleteInput, {
     deleted: string[];
     blocked: string[];

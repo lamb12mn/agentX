@@ -24,7 +24,7 @@
     "start:enhanced": "set AGENTX_ENHANCED=true && node dist/index.js",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint src/ tests/ --ext .ts",
+    "lint": "eslint src/ tests/",
     "prepublishOnly": "npm run build && npm run typecheck && npm test",
     "dev": "tsx watch src/index.ts",
     "dev:enhanced": "set AGENTX_ENHANCED=true && tsx watch src/index.ts",

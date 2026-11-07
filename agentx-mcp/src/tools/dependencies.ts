@@ -7,7 +7,7 @@ import {
   detectCircularDependency,
 } from '../store/dependencies.js';
 import type { AssetMeta } from '../types.js';
-import { createError, ErrorCode } from '../utils/errors.js';
+import { createError } from '../utils/errors.js';
 
 /**
  * Dependency management MCP tools - provides dependency checking and graph analysis

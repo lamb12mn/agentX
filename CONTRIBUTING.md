@@ -21,7 +21,7 @@
 
 ### 前置要求
 
-- **Node.js**: >= 18.0.0（推荐使用 20.x LTS）
+- **Node.js**: >= 20.0.0（与 `agentx-mcp/package.json` 的 `engines.node` 一致）
 - **npm**: >= 9.0.0（或使用 pnpm/yarn）
 - **Git**: 用于版本控制
 - **操作系统**: Windows / macOS / Linux 均可
@@ -30,7 +30,7 @@
 
 ```bash
 # 1. 克隆仓库
-git clone https://github.com/your-org/agentx.git
+git clone https://github.com/agentx/agentx-mcp.git
 cd agentx
 
 # 2. 安装依赖（在 agentx-mcp 目录）
@@ -121,6 +121,8 @@ npm start
 
 ### 目录结构
 
+以下为**核心文件示意**；完整模块清单见 [README.md](README.md) 的项目结构章节。
+
 ```
 agentx-mcp/
 ├── src/
@@ -138,12 +140,12 @@ agentx-mcp/
 │   │   ├── workflows.ts
 │   │   ├── search.ts
 │   │   └── import.ts
-│   └── types/                # 共享类型定义
-│       └── index.ts
+│   ├── types.ts              # 公共类型（AssetType / AssetMeta 等）
+│   └── types/                # 子模块类型定义
 ├── tests/
 │   ├── store/                # 存储层测试
 │   ├── tools/                # 工具层测试
-│   └── fixtures/             # 测试数据
+│   └── api/、cli/、security/… # 其余测试按模块平行组织
 ├── dist/                     # 构建输出（gitignore）
 └── package.json
 ```
@@ -232,35 +234,37 @@ npm test -- skills.test.ts
 
 ### 测试结构
 
-**示例测试文件：**
+**示例测试文件**（与 `tests/store/db.test.ts` 的实际写法一致）：
 ```typescript
 // tests/store/assets.test.ts
-import { describe, it, expect, beforeEach } from 'vitest';
-import { initDb, getAsset, createAsset } from '../src/store/assets';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { mkdtempSync, rmSync } from 'fs';
+import { tmpdir } from 'os';
+import { join } from 'path';
+import { initDb, closeDb } from '../../src/store/db.js';
+import { createAsset } from '../../src/store/assets.js';
+
+let tmpDir: string;
+
+beforeEach(() => {
+  tmpDir = mkdtempSync(join(tmpdir(), 'agentx-test-'));
+  initDb(join(tmpDir, 'db.sqlite'));
+});
+
+afterEach(() => {
+  closeDb();
+  rmSync(tmpDir, { recursive: true });
+});
 
 describe('Asset Store', () => {
-  beforeEach(() => {
-    // 每个测试前清空数据库
-    initDb(':memory:');
-  });
-
-  it('should create a new asset', () => {
-    const asset = createAsset({
-      type: 'skill',
-      name: 'test-skill',
-      content: '# Test Skill',
-    });
-
-    expect(asset).toBeDefined();
+  it('creates an asset', async () => {
+    // createAsset(input, content, baseDir) 为异步函数
+    const asset = await createAsset(
+      { type: 'skill', name: 'test-skill', tags: [] },
+      '# Test Skill',
+      tmpDir
+    );
     expect(asset.name).toBe('test-skill');
-  });
-
-  it('should throw when asset name already exists', () => {
-    createAsset({ name: 'duplicate', content: '...' });
-
-    expect(() =>
-      createAsset({ name: 'duplicate', content: '...' })
-    ).toThrow('Asset already exists');
   });
 });
 ```
@@ -417,17 +421,17 @@ git push origin feature/my-feature
 # 启用详细日志
 AGENTX_LOG_LEVEL=debug npm start
 
-# 查看数据库内容
-npx better-sqlite3 ~/.agentx/agentx.db "SELECT * FROM assets LIMIT 10;"
+# 查看数据库内容：用任意 SQLite 客户端打开 ~/.agentx/agentx.db
+# SELECT * FROM assets LIMIT 10;
 ```
 
-**CLI 调试：**
+**CLI 调试**（在 `agentx-mcp/` 目录下执行）：
 ```bash
 # 使用 tsx 直接运行（无需构建）
-npx tsx agentx-mcp/src/cli.ts list-skills
+npx tsx src/cli.ts list skill
 
 # 使用 Node.js inspect
-node --inspect-brk dist/cli.js list-skills
+node --inspect-brk dist/cli.js list
 ```
 
 ### 性能分析
@@ -450,10 +454,12 @@ npx clinic doctor -- node dist/index.js
 |-----------|------|---------|
 | `src/store/db.ts` | SQLite 数据库初始化、表结构 | `initDb`, `getDb` |
 | `src/store/assets.ts` | 资产 CRUD 操作 | `createAsset`, `getAsset`, `listAssets` |
+| `src/store/evaluations.ts` | Prompt 评测集/样本/评分存储 | `createEvaluationSet`, `rateEvaluationSample`, `getEvaluationSummary` |
 | `src/tools/skills.ts` | Skill MCP 工具注册 | `registerSkillTools` |
+| `src/tools/evaluations.ts` | Prompt 评测 MCP 工具注册 | `registerEvaluationTools` |
 | `src/tools/agents.ts` | Agent MCP 工具注册 | `registerAgentTools` |
-| `src/index.ts` | MCP 服务器主入口 | `main` 函数 |
-| `src/cli.ts` | CLI 命令定义 | `program` (commander) |
+| `src/index.ts` | MCP 服务器主入口 | 顶层启动逻辑（`main()` 为内部函数，不导出） |
+| `src/cli.ts` | CLI 命令定义 | `program`（commander，顶层 `program.parse()`，不导出） |
 
 ### 数据流
 
@@ -473,23 +479,26 @@ SQLite 数据库
 
 ### 类型定义
 
-所有公共类型定义在 `src/types/index.ts`：
+公共类型定义在 `src/types.ts`（`src/types/` 目录存放子模块类型），字段与 `src/store/assets.ts` 的 `rowToMeta()` 一致：
 
 ```typescript
+export type AssetType =
+  'skill' | 'mcp' | 'prompt' | 'rule' | 'workflow' | 'agent' | 'team';
+
 export interface AssetMeta {
   id: string;
   type: AssetType;
   name: string;
-  createdAt: string;
-  updatedAt: string;
-  tags?: string[];
+  description: string | undefined;
+  tags: string[];
+  file_path: string;
+  created_at: number;
+  updated_at: number;
 }
-
-export type AssetType = 'skill' | 'prompt' | 'rule' | 'mcp' | 'workflow' | 'agent';
 ```
 
 **新增类型时：**
-1. 在 `src/types/index.ts` 定义
+1. 在 `src/types.ts` 定义
 2. 导出类型（`export type` 或 `export interface`）
 3. 在相关模块中导入使用
 
@@ -501,7 +510,7 @@ export type AssetType = 'skill' | 'prompt' | 'rule' | 'mcp' | 'workflow' | 'agen
 
 例如添加 `"template"` 类型：
 
-1. **更新类型定义** (`src/types/index.ts`)：
+1. **更新类型定义** (`src/types.ts`)：
    ```typescript
    export type AssetType = 'skill' | 'prompt' | ... | 'template';
    ```

@@ -177,55 +177,39 @@ AgentX 可以作为 MCP 服务器运行，供 Claude Code 调用。
 
 #### 可用工具列表
 
-下列为资产管理工具的基础清单；另有 batch、clone、version、export、dependency、team 等扩展工具，完整清单以运行时 `tools/list` 为准：
+当前基础模式注册 **65 个工具**（15 个注册模块）；设置 `AGENTX_ENHANCED=true` 后额外注册 **38 个增强工具**，合计 103 个。工具名与 `inputSchema` 以运行时 `tools/list` 为准，逐项说明见 [docs/API_REFERENCE.md](docs/API_REFERENCE.md)。
 
-**Skills 管理**（5 个）：
-- `list_skills` - 列出所有技能
-- `get_skill` - 获取技能详情
-- `create_skill` - 创建新技能
-- `update_skill` - 更新技能
-- `delete_skill` - 删除技能
+**资产 CRUD**（30 个）：`skills | prompts | rules | mcps | workflows | agents` 六类各提供 `list_*`、`get_*`、`create_*`、`update_*`、`delete_*`。
 
-**Prompts 管理**（5 个）：
-- `list_prompts` - 列出所有提示词
-- `get_prompt` - 获取提示词详情
-- `create_prompt` - 创建提示词
-- `update_prompt` - 更新提示词
-- `delete_prompt` - 删除提示词
+**搜索与导入**（2 个）：`search_assets`（FTS5 全文搜索）、`import_from_claude`（从 Claude Code 导入）。
 
-**Rules 管理**（5 个）：
-- `list_rules` - 列出所有规则
-- `get_rule` - 获取规则详情
-- `create_rule` - 创建规则
-- `update_rule` - 更新规则
-- `delete_rule` - 删除规则
+**批量与克隆**（4 个）：`batch_delete`、`batch_tag_add`、`batch_tag_remove`、`clone_asset`。
 
-**MCPs 管理**（5 个）：
-- `list_mcps` - 列出所有 MCP 配置
-- `get_mcp` - 获取 MCP 配置详情
-- `create_mcp` - 创建 MCP 配置
-- `update_mcp` - 更新 MCP 配置
-- `delete_mcp` - 删除 MCP 配置
+**版本与导出**（8 个）：`create_version_snapshot`、`list_versions`、`get_version`、`rollback_to_version`、`clear_versions`、`version_stats`、`export_agent`、`export_all`。
 
-**Agents 管理**（6 个）：
-- `list_agents` - 列出所有智能体
-- `get_agent` - 获取智能体详情
-- `create_agent` - 创建智能体
-- `update_agent` - 更新智能体
-- `delete_agent` - 删除智能体
-- `export_agent` - 导出智能体
+**依赖与评测**（10 个）：`check_dependencies`、`get_dependents`、`get_dependencies`、`get_dependency_graph`、`detect_circular_dependency`、`create_evaluation_set`、`list_evaluation_sets`、`add_evaluation_sample`、`rate_evaluation_sample`、`evaluation_summary`。评测为本地评分（`score` 1-5 分 / `gsb` 比较），不调用外部模型；`{{变量}}` 在录入样本时本地渲染。
 
-**其他工具**：
-- `search_assets` - 全文搜索所有资产
-- `import_assets` - 从 Claude Code 导入资产
+**团队编排**（11 个）：`team.create`、`team.run`、`team.status`、`team.results`、`team.cancel`、`team.list`、`team.history`、`team.logs`、`team.approve`、`team.reject`、`team.pending`。
 
-> **详细 API 文档**：参见 [docs/API_REFERENCE.md](docs/API_REFERENCE.md)
+**增强模式追加**（38 个）：`cache.*`（2）、`system.stats`（1）、`plugins.*`（4）、`sync.*`（5）、`ai.*`（4）、`api.*`（3）、`monitor.*`（4）、`editor.*`（6）、`ui.mobile.*`（3）、`vault.*`（6）。
+
+> 基础工具实现位于 `agentx-mcp/src/tools/`，增强工具定义在 `agentx-mcp/src/index.ts`；两者均由 `src/index.ts` 汇总注册。
 
 ---
 
 ### CLI 命令详解
 
-AgentX 提供功能完整的命令行工具 `agentx`。当前支持的命令：
+AgentX 提供命令行工具 `agentx`，当前共有 **25 个顶层命令**（不含 `help`），完整列表以 `agentx --help` 为准：
+
+| 分组 | 命令 |
+|------|------|
+| 资产 | `list`、`get`、`create`、`delete`、`clone`、`search`、`info`、`validate`、`templates` |
+| 导入导出 | `import`、`export`、`export-all`、`backup`、`restore` |
+| 编排与团队 | `team`（create/run/status/results/cancel/list/history/logs/approve/reject/pending）、`graph` |
+| 批量与 MCP | `batch`、`mcp`（send/inspect）、`proxy`、`init` |
+| 运维 | `doctor`、`audit`、`vault`、`remote`（add/list/remove/pull/push）、`web` |
+
+下列为常用命令的参数说明：
 
 #### 1. `agentx list [type]`
 
@@ -300,7 +284,7 @@ workflows:  1
 agents:     2
 ────────────────────
 total:      17
-db:          /Users/alice/.agentx/db.sqlite (156 KB)
+db:          /Users/alice/.agentx/agentx.db (156 KB)
 ```
 
 #### 4. `agentx get <id>`
@@ -358,22 +342,25 @@ agentx import prompt --source ~/.claude/prompts
 agentx import rule --tags "security,imported"
 ```
 
-> **注意**: 创建资产当前仅通过 MCP 服务器（Claude Code）支持，CLI 暂未提供创建功能。
+> **提示**：创建资产也可直接使用 CLI：`agentx create -t skill -n my-skill -c '# 内容'`，或加 `-i` 进入交互模式；支持 `skill | prompt | rule | mcp | workflow | agent` 六种类型。
 
 ---
 
 ### 资产类型说明
 
-AgentX 支持 6 种资产类型，每种类型对应不同的文件格式和用途。
+`AssetType` 共 7 种：`skill | prompt | rule | mcp | workflow | agent | team`。其中前 6 种可通过 CLI `create` 或 MCP 工具创建，`team` 由 `team.*` 工具内部管理（团队配置），不开放给 `create`。
+
+资产文件按 `{type}s/{name}{ext}` **平铺存放**（无按 ID 分目录），扩展名由 `src/store/assets.ts` 的 `fileExtension()` 决定：
 
 | 类型 | 文件扩展名 | 存储目录 | 用途 |
 |------|-----------|---------|------|
 | **Skill** | `.md` | `skills/` | 可调用的能力单元（如代码审查、写作润色） |
 | **Prompt** | `.md` | `prompts/` | 角色/任务模板（系统提示、few-shot 示例） |
 | **Rule** | `.md` | `rules/` | 约束与行为准则（输出语言、安全限制） |
-| **MCP** | `.json` | `mcps/` | 外部工具连接器（文件系统、GitHub、数据库） |
+| **MCP** | `.yaml` | `mcps/` | 外部工具连接器（文件系统、GitHub、数据库） |
 | **Workflow** | `.yaml` | `workflows/` | 多步骤编排逻辑（顺序/并行/条件分支） |
-| **Agent** | `.yaml` | `agents/{id}/` | 以上积木的组合体（完整智能体定义） |
+| **Agent** | `.yaml` | `agents/` | 以上积木的组合体（完整智能体定义） |
+| **Team** | `.yaml` | `teams/` | 多智能体编排配置，由 `team.*` 工具读写 |
 
 #### 资产示例
 
@@ -484,7 +471,7 @@ npm test
 ### 代码规范
 
 - 遵循 TypeScript 严格模式
-- 使用 ESLint（如有配置）
+- 使用 ESLint（配置见 `agentx-mcp/eslint.config.js`）
 - 提交前运行 `npm test` 确保测试通过
 - 提交信息使用约定式提交：[Conventional Commits](https://www.conventionalcommits.org/)
 
@@ -542,6 +529,17 @@ rm -rf dist
 npm run build
 ```
 
+#### 5. **"was compiled against a different Node.js version"**
+
+**原因**：`better-sqlite3` 是原生模块，切换 Node 主版本后二进制未重新编译。MCP 服务器在顶层 `initDb()` 阶段就会退出，测试也会全部失败。
+
+**解决**：
+```bash
+# 重新编译原生模块（在 agentx-mcp 目录下）
+npm rebuild better-sqlite3
+```
+确认当前 Node 版本满足 `engines.node`（≥ 20）后重启服务。
+
 ---
 
 ## ❓ 常见问题
@@ -569,7 +567,7 @@ A: 直接复制 `~/.agentx/` 目录即可。所有资产以独立文件存储，
 
 **Q: 支持团队协作吗？**
 
-A: 当前版本为单用户设计。团队协作功能（Git 同步、权限管理）在路线图中，敬请期待。
+A: 本地资产库仍是单用户设计，但已提供 `agentx remote`（推送/拉取远程库）、`team.*`（多智能体编排）和 `vault`（凭据加密）。云端多人权限管理尚未实现。
 
 ---
 
@@ -611,21 +609,29 @@ npm update -g agentx-mcp
 
 - **详细文档**：查看 [docs/](docs/) 目录
 - **API 参考**：[docs/API_REFERENCE.md](docs/API_REFERENCE.md)
-- **架构设计**：[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
-- **故障排除**：[docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)
+- **架构与演进设计**：[docs/superpowers/specs/2026-04-28-agentx-v2-design.md](docs/superpowers/specs/2026-04-28-agentx-v2-design.md)
+- **Team Engine 设计**：[docs/superpowers/specs/2026-06-13-team-engine-improvements-design.md](docs/superpowers/specs/2026-06-13-team-engine-improvements-design.md)
+- **故障排除**：见本页 [故障排除](#-故障排除) 章节
 - **问题反馈**：https://github.com/agentx/agentx-mcp/issues
 
 ---
 
 **⭐ 如果这个项目对您有帮助，请给我们一个 Star！**
 
-*最后更新：2026-04-29*
+*最后更新：2026-11-07*
 
 ### 环境变量配置
 
 | 变量 | 默认值 | 说明 |
 |---|---|---|
-| `AGENTX_DIR` | `~/.agentx/` | 自定义数据存储根目录（SQLite 数据库 + 资产文件） |
+| `AGENTX_DIR` | `~/.agentx` | 自定义数据存储根目录（SQLite `agentx.db` + 资产文件） |
+| `AGENTX_ENHANCED` | `false` | 设为 `true` 启用增强模块与 38 个增强工具 |
+| `AGENTX_API_PORT` | `3000` | REST API 端口（增强模式） |
+| `AGENTX_API_HOST` | `localhost` | REST API 监听地址（增强模式） |
+| `AGENTX_API_KEY` | 未设置 | 设置后启用 REST API 认证；未设置时认证关闭并输出警告 |
+| `AGENTX_MONITOR_INTERVAL` | `5000` | 监控面板刷新间隔（ms，增强模式） |
+
+源码中另有 `AGENTX_HOME`、`AGENTX_VAULT_*`、`AGENTX_OTEL_*`、`AGENTX_MCP_*`、`AGENTX_LOG_LEVEL` 等变量，完整清单以 `agentx-mcp/src/` 为准。
 
 **MCP 服务器配置示例**（仅对 MCP 实例生效）：
 ```json

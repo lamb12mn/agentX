@@ -32,7 +32,7 @@ export function registerMcpInspect(mcp: Command) {
                         try {
                             const json = JSON.parse(line);
                             console.log(chalk.green('\n← '), JSON.stringify(json, null, 2));
-                        } catch(e) {
+                        } catch {
                             console.log(chalk.yellow('\n← (raw)'), line);
                         }
                         rl.prompt();
@@ -52,7 +52,7 @@ export function registerMcpInspect(mcp: Command) {
                 if (input.trim().startsWith('{')) {
                     try {
                         message = JSON.parse(input);
-                    } catch(e) {
+                    } catch {
                         console.error(chalk.red('Invalid JSON.'));
                         rl.prompt();
                         return;
@@ -65,7 +65,7 @@ export function registerMcpInspect(mcp: Command) {
                     let paramsObj;
                     try {
                         paramsObj = JSON.parse(params);
-                    } catch(e) {
+                    } catch {
                         paramsObj = {};
                     }
                     message = {

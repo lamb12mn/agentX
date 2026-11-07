@@ -118,8 +118,8 @@ function isTruthy(value: unknown): boolean {
 /** Compare two operands with a whitelisted operator only. */
 function compareValues(left: unknown, op: string, right: unknown): boolean {
   switch (op) {
-    case '==': return left == right; // eslint-disable-line eqeqeq
-    case '!=': return left != right; // eslint-disable-line eqeqeq
+    case '==': return left == right;
+    case '!=': return left != right;
     case '===': return left === right;
     case '!==': return left !== right;
     case '>': return Number(left) > Number(right);

@@ -25,7 +25,7 @@ export interface PluginAPI {
   /** 插件版本 */
   version: string;
   /** 注册钩子处理函数 */
-  registerHook: (hook: string, handler: Function) => void;
+  registerHook: (hook: string, handler: (...args: unknown[]) => unknown) => void;
   /** 发送事件 */
   emitEvent: (event: string, data: any) => void;
   /** 获取指定插件实例 */

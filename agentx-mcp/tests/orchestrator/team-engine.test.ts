@@ -50,13 +50,13 @@ function stubHandler(agent: TeamAgent, input: Record<string, unknown>): Promise<
 }
 
 /** Handler that always throws (simulates failure) */
-function failingHandler(agent: TeamAgent, input: Record<string, unknown>): Promise<Omit<StepResult, 'durationMs'>> {
+function failingHandler(agent: TeamAgent, _input: Record<string, unknown>): Promise<Omit<StepResult, 'durationMs'>> {
   return Promise.reject(new Error(`Agent "${agent.role}" failed`));
 }
 
 /** Handler that fails N times then succeeds */
 function retryHandler(failCount: number): (agent: TeamAgent, input: Record<string, unknown>) => Promise<Omit<StepResult, 'durationMs'>> {
-  let attempts = new Map<string, number>();
+  const attempts = new Map<string, number>();
   return async (agent, input) => {
     const count = attempts.get(agent.role) ?? 0;
     attempts.set(agent.role, count + 1);
