@@ -118,3 +118,39 @@ export class NoopProvider implements AiProvider {
     };
   }
 }
+
+/**
+ * Build a real provider from environment variables when configured.
+ *
+ *   AGENTX_AI_API_KEY   required — without it the caller stays fully local
+ *   AGENTX_AI_BASE_URL  optional — any OpenAI-compatible endpoint
+ *   AGENTX_AI_MODEL     optional — default model name
+ *
+ * Returns `undefined` when no key is set, so existing local-only fallbacks
+ * (TeamEngine's simulated stub) keep working unchanged.
+ */
+export function createAiProviderFromEnv(): AiProvider | undefined {
+  const apiKey = process.env.AGENTX_AI_API_KEY?.trim();
+  if (!apiKey) return undefined;
+
+  return new OpenAiProvider({
+    apiKey,
+    baseUrl: process.env.AGENTX_AI_BASE_URL?.trim() || undefined,
+    defaultModel: process.env.AGENTX_AI_MODEL?.trim() || undefined,
+  });
+}
+
+/** Sentinel error for AI-only features invoked without a configured provider. */
+export class AiProviderNotConfiguredError extends Error {
+  constructor() {
+    super('AI provider is not configured. Set AGENTX_AI_API_KEY (optionally AGENTX_AI_BASE_URL / AGENTX_AI_MODEL) to enable AI features.');
+    this.name = 'AiProviderNotConfiguredError';
+  }
+}
+
+/** Resolve an injected provider, or build one from the environment; throw if absent. */
+export function requireAiProvider(injected?: AiProvider): AiProvider {
+  const provider = injected ?? createAiProviderFromEnv();
+  if (!provider) throw new AiProviderNotConfiguredError();
+  return provider;
+}

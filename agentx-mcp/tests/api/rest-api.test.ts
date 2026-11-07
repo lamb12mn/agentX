@@ -1,7 +1,12 @@
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, afterEach, beforeEach } from 'vitest';
+import { mkdtempSync, rmSync } from 'fs';
+import { tmpdir } from 'os';
+import { join } from 'path';
 import { RESTAPI } from '../../src/api/rest-api.js';
 import type { APIRequest } from '../../src/api/rest-api.js';
 import { clearAssetCache, getAssetFromCache } from '../../src/store/cache.js';
+import { initDb, closeDb } from '../../src/store/db.js';
+import { createAsset } from '../../src/store/assets.js';
 
 function makeRequest(method: string, path: string, headers: Record<string, string> = {}): APIRequest {
   return { method, path, query: {}, body: {}, headers };
@@ -42,16 +47,22 @@ describe('REST API default routes', () => {
     expect(res.data).toHaveProperty('paginatedCacheSize');
   });
 
-  it('POST /api/workflows/execute reports not implemented', async () => {
+  it('POST /api/workflows/execute validates its input', async () => {
     const api = makeApi();
     currentApi = api;
     await api.start();
 
-    const res = await api.handleRequest(makeRequest('POST', '/api/workflows/execute'));
+    const missing = await api.handleRequest(makeRequest('POST', '/api/workflows/execute'));
+    expect(missing.success).toBe(false);
+    expect(missing.message).toContain('workflowId');
 
-    expect(res.success).toBe(true);
-    expect(res.data.execution.status).toBe('not_implemented');
-    expect(res.data.execution.message).toBe('Execution not yet implemented');
+    const badInput: APIRequest = {
+      ...makeRequest('POST', '/api/workflows/execute'),
+      body: { workflowId: 'x', input: 'not-an-object' },
+    };
+    const invalid = await api.handleRequest(badInput);
+    expect(invalid.success).toBe(false);
+    expect(invalid.message).toContain('input');
   });
 
   it('start() binds a real HTTP socket and stop() releases it', async () => {
@@ -69,6 +80,45 @@ describe('REST API default routes', () => {
     const json = (await resp.json()) as { success: boolean; data: { status: string } };
     expect(json.success).toBe(true);
     expect(json.data.status).toBe('ok');
+  });
+});
+
+describe('REST API workflow execution', () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = mkdtempSync(join(tmpdir(), 'agentx-rest-workflow-test-'));
+    initDb(join(tmpDir, 'test.db'));
+  });
+
+  afterEach(() => {
+    closeDb();
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it('POST /api/workflows/execute runs a stored workflow and returns the full result', async () => {
+    const asset = await createAsset(
+      { type: 'workflow', name: 'wf', tags: [] },
+      'steps:\n  - from: start\n    to: writer\n',
+      tmpDir,
+    );
+
+    const api = makeApi();
+    currentApi = api;
+    await api.start();
+
+    const req: APIRequest = {
+      ...makeRequest('POST', '/api/workflows/execute'),
+      body: { workflowId: asset.id, input: { topic: 'SQLite' } },
+    };
+    const res = await api.handleRequest(req);
+
+    expect(res.success).toBe(true);
+    expect(res.data.execution.status).toBe('completed');
+    expect(res.data.execution.simulated).toBe(true);
+    expect(res.data.execution.steps).toHaveLength(1);
+    expect(res.data.execution.aggregatedOutput).toMatchObject({ topic: 'SQLite' });
+    expect(res.data.execution.sessionId).toBeTruthy();
   });
 });
 

@@ -53,10 +53,17 @@ const declaredEnhanced = Number(readme.match(/额外注册 \*\*(\d+) 个增强�
 const declaredCli = Number(readme.match(/共有 \*\*(\d+) 个顶层命令\*\*/)?.[1]);
 const missingInApiRef = [...baseTools, ...enhancedTools].filter((k) => !apiRef.includes(`\`${k}\``));
 
+// 工具列表各分组声明的个数之和应与源码一致（排除「增强模式追加」分组）
+const toolSection = readme.split('#### 可用工具列表')[1]?.split('\n---')[0] ?? '';
+const groupCounts = [...toolSection.matchAll(/^\*\*(?!增强模式追加)([^*]+)\*\*（(\d+) 个）/gm)]
+  .map((m) => Number(m[2]));
+const groupSum = groupCounts.reduce((sum, n) => sum + n, 0);
+
 const checks = [
   [`README version badge matches ${pkg.version}`, readme.includes(`version-${pkg.version}-green.svg`)],
   [`README Node badge matches engines.node (${pkg.engines.node})`, readme.includes(`node-%3E%3D${nodeMajor}-brightgreen.svg`)],
   [`README base tool count matches source (${baseTools.size})`, declaredBase === baseTools.size],
+  [`README tool group counts sum matches source (${baseTools.size})`, groupCounts.length >= 5 && groupSum === baseTools.size, `groups=${groupCounts.join('+')} sum=${groupSum}`],
   [`README enhanced tool count matches source (${enhancedTools.length})`, declaredEnhanced === enhancedTools.length],
   [`API_REFERENCE lists every registered tool`, missingInApiRef.length === 0, missingInApiRef.join(', ')],
   [`README CLI count matches documented commands (${documentedCommands.length})`, declaredCli === documentedCommands.length],

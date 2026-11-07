@@ -177,7 +177,7 @@ AgentX 可以作为 MCP 服务器运行，供 Claude Code 调用。
 
 #### 可用工具列表
 
-当前基础模式注册 **65 个工具**（15 个注册模块）；设置 `AGENTX_ENHANCED=true` 后额外注册 **38 个增强工具**，合计 103 个。工具名与 `inputSchema` 以运行时 `tools/list` 为准，逐项说明见 [docs/API_REFERENCE.md](docs/API_REFERENCE.md)。
+当前基础模式注册 **69 个工具**（15 个注册模块）；设置 `AGENTX_ENHANCED=true` 后额外注册 **38 个增强工具**，合计 107 个。工具名与 `inputSchema` 以运行时 `tools/list` 为准，逐项说明见 [docs/API_REFERENCE.md](docs/API_REFERENCE.md)。
 
 **资产 CRUD**（30 个）：`skills | prompts | rules | mcps | workflows | agents` 六类各提供 `list_*`、`get_*`、`create_*`、`update_*`、`delete_*`。
 
@@ -187,7 +187,7 @@ AgentX 可以作为 MCP 服务器运行，供 Claude Code 调用。
 
 **版本与导出**（8 个）：`create_version_snapshot`、`list_versions`、`get_version`、`rollback_to_version`、`clear_versions`、`version_stats`、`export_agent`、`export_all`。
 
-**依赖与评测**（10 个）：`check_dependencies`、`get_dependents`、`get_dependencies`、`get_dependency_graph`、`detect_circular_dependency`、`create_evaluation_set`、`list_evaluation_sets`、`add_evaluation_sample`、`rate_evaluation_sample`、`evaluation_summary`。评测为本地评分（`score` 1-5 分 / `gsb` 比较），不调用外部模型；`{{变量}}` 在录入样本时本地渲染。
+**依赖与评测**（14 个）：`check_dependencies`、`get_dependents`、`get_dependencies`、`get_dependency_graph`、`detect_circular_dependency`、`create_evaluation_set`、`list_evaluation_sets`、`add_evaluation_sample`、`add_evaluation_samples`、`list_evaluation_samples`、`rate_evaluation_sample`、`evaluation_summary`、`compare_evaluation_sets`、`suggest_prompt_improvements`。评测为本地评分（`score` 1-5 分 / `gsb` 比较），不调用外部模型；`{{变量}}` 在录入样本时本地渲染，可由一个种子提问加变量集批量构建评测数据集，按低分 / 未评分 / GSB 判定筛选样本明细，对比同一资产两个版本的评测结果判断优化是否有效，并由 `suggest_prompt_improvements` 基于弱样本产出**纯规则**的改写建议（未评分、未渲染变量、缺参照答案、低分反馈、变量取值集中）。
 
 **团队编排**（11 个）：`team.create`、`team.run`、`team.status`、`team.results`、`team.cancel`、`team.list`、`team.history`、`team.logs`、`team.approve`、`team.reject`、`team.pending`。
 
@@ -199,7 +199,7 @@ AgentX 可以作为 MCP 服务器运行，供 Claude Code 调用。
 
 ### CLI 命令详解
 
-AgentX 提供命令行工具 `agentx`，当前共有 **25 个顶层命令**（不含 `help`），完整列表以 `agentx --help` 为准：
+AgentX 提供命令行工具 `agentx`，当前共有 **26 个顶层命令**（不含 `help`），完整列表以 `agentx --help` 为准：
 
 | 分组 | 命令 |
 |------|------|
@@ -207,6 +207,7 @@ AgentX 提供命令行工具 `agentx`，当前共有 **25 个顶层命令**（�
 | 导入导出 | `import`、`export`、`export-all`、`backup`、`restore` |
 | 编排与团队 | `team`（create/run/status/results/cancel/list/history/logs/approve/reject/pending）、`graph` |
 | 批量与 MCP | `batch`、`mcp`（send/inspect）、`proxy`、`init` |
+| 评测 | `evaluation`（snapshot/create/list/add-sample/add-samples/rate/samples/summary/compare/suggest） |
 | 运维 | `doctor`、`audit`、`vault`、`remote`（add/list/remove/pull/push）、`web` |
 
 下列为常用命令的参数说明：
@@ -343,6 +344,36 @@ agentx import rule --tags "security,imported"
 ```
 
 > **提示**：创建资产也可直接使用 CLI：`agentx create -t skill -n my-skill -c '# 内容'`，或加 `-i` 进入交互模式；支持 `skill | prompt | rule | mcp | workflow | agent` 六种类型。
+
+#### 8. `agentx evaluation`
+
+本地 Prompt 评测闭环：9 个子命令与评测 MCP 工具一一对应，另有 `snapshot` 作为纯 CLI 前置辅助命令（评测集必须绑定已存在的版本快照）；所有子命令输出 JSON，便于脚本串联。
+
+```bash
+# 1. 创建版本快照，返回版本号（也可先用 MCP 的 create_version_snapshot）
+agentx evaluation snapshot <assetId>
+
+# 2. 绑定版本快照创建评测集（默认 score 模式，可用 --mode gsb）
+agentx evaluation create <assetId> 1 baseline --mode score
+
+# 3. 录入样本（{{变量}} 本地渲染）
+agentx evaluation add-sample <setId> '总结 {{topic}}' '<回答>' --variables '{"topic":"SQLite"}'
+
+# 4. 批量构建：samples.json 为 [{ "answer": "...", "variables": { ... } }, ...]
+agentx evaluation add-samples <setId> '总结 {{topic}}' samples.json
+
+# 5. 评分、聚焦弱项、汇总、对比新版本、生成改写建议
+agentx evaluation rate <sampleId> --score 2 --feedback 'too short'
+agentx evaluation samples <setId> --max-score 2
+agentx evaluation summary <setId>
+agentx evaluation compare <baselineSetId> <candidateSetId>
+agentx evaluation suggest <setId> --max-score 2
+```
+
+子命令：`snapshot` / `create` / `list` / `add-sample` / `add-samples` / `rate` / `samples` / `summary` / `compare` / `suggest`。
+`rate` 在 GSB 模式用 `--gsb good|same|bad`；`samples` 支持 `--rated` / `--unrated` / `--gsb` / `--max-score` / `--limit`；`suggest` 为纯规则诊断，不调用外部模型。
+
+> CLI 与 MCP 需设置同一个 `AGENTX_DIR` 才能访问同一份评测数据。
 
 ---
 

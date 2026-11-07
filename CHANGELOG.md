@@ -7,8 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Prompt 评测闭环（参照火山方舟 PromptPilot 的评测数据集 / 低分样本 / 版本对比机制，纯本地实现）：
+  - `add_evaluation_samples`：一个种子提问模板 + 变量集批量构建评测数据集，单事务写入
+  - `list_evaluation_samples`：按已评分 / 未评分、低分、GSB 判定筛选样本明细，用于聚焦弱项
+  - `compare_evaluation_sets`：对比同一资产两个版本的平均分差、GSB 净胜率与评分覆盖率
+  - 新增 10 个测试用例，覆盖批量事务回滚、过滤边界、跨版本判定与模式/资产校验
+- 本地改写建议与 CLI 评测入口（第 2 轮迭代，仍不调用外部模型）：
+  - `suggest_prompt_improvements`：基于弱样本的纯规则诊断，输出未评分、未渲染变量、缺参照答案、低分反馈、变量取值集中等可操作建议
+  - CLI `evaluation` 命令组：9 个子命令与评测 MCP 工具一一对应，另加 `snapshot` 前置辅助命令，使纯 CLI 也能创建版本快照；统一 JSON 输出、失败不调用 `process.exit()`
+  - 新增 6 个评测工具测试与 4 个 CLI 端到端测试，覆盖两种模式、阈值/上限校验与错误边界
+
 ### Changed
 
+- README / API_REFERENCE: 工具数同步为 69 个基础工具 + 38 个增强工具、26 个 CLI 命令，补入改写建议报告与 `evaluation` 子命令对照表
+- scripts: `verify-docs.mjs` 增加「工具分组计数之和与源码一致」校验（共 10 项）
+- README / API_REFERENCE: 工具数同步为 68 个基础工具 + 38 个增强工具，补入评测闭环流程
 - README: 统一快速开始中 MCP 配置示例，添加 args 和 env 字段
 - CI: 固定 GitHub Actions 第三方 action 版本为 commit SHA，防止供应链攻击
 - 文档与实现对齐：README / CONTRIBUTING / API_REFERENCE 按当前源码同步（65 个基础工具 + 38 个增强工具、25 个 CLI 命令、7 种资产类型、Node ≥20、`src/types.ts`、实际存储路径与错误码）

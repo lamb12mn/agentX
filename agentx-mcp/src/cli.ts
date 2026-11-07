@@ -28,6 +28,7 @@ import { registerRemoteAdd } from "./cli/commands/remote/add.js";
 import { registerRestoreCommand } from "./cli/commands/restore.js";
 import { registerVaultCommand } from "./cli/commands/vault.js";
 import { registerTeamCommand } from "./cli/commands/team.js";
+import { registerEvaluationCommand } from "./cli/commands/evaluations.js";
 
 const program = new Command();
 
@@ -83,6 +84,9 @@ registerVaultCommand(program);
 
 // Team orchestration commands
 registerTeamCommand(program);
+
+// Prompt evaluation commands
+registerEvaluationCommand(program);
 
 // Web dashboard
 program

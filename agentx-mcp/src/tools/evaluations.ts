@@ -2,14 +2,33 @@ import {
   createEvaluationSet,
   listEvaluationSets,
   addEvaluationSample,
+  addEvaluationSamples,
+  listEvaluationSamples,
   rateEvaluationSample,
   getEvaluationSummary,
+  compareEvaluationSets,
+  suggestEvaluationImprovements,
 } from '../store/evaluations.js';
 import type {
   EvaluationSet,
   EvaluationSample,
   EvaluationSummary,
+  EvaluationComparison,
+  ImprovementReport,
 } from '../store/evaluations.js';
+import { applyEvaluationDsl } from '../store/evaluation-dsl.js';
+import type {
+  EvaluationDsl,
+  DslApplicationResult,
+} from '../store/evaluation-dsl.js';
+import {
+  aiRateEvaluationSamples,
+  aiRewritePrompt,
+} from '../store/evaluation-ai.js';
+import type {
+  AiRateResult,
+  AiRewriteResult,
+} from '../store/evaluation-ai.js';
 import type { ToolHandler } from './common.js';
 import type { EvaluationMode, GsbVerdict } from '../types.js';
 
@@ -47,6 +66,55 @@ export function registerEvaluationTools(): {
     feedback?: string;
   }, EvaluationSample>;
   evaluation_summary: ToolHandler<{ setId: string }, EvaluationSummary>;
+  add_evaluation_samples: ToolHandler<{
+    setId: string;
+    question: string;
+    samples: Array<{
+      answer: string;
+      variables?: Record<string, unknown>;
+      idealAnswer?: string;
+      referenceAnswer?: string;
+      feedback?: string;
+    }>;
+  }, EvaluationSample[]>;
+  list_evaluation_samples: ToolHandler<{
+    setId: string;
+    rated?: boolean;
+    maxScore?: number;
+    gsb?: GsbVerdict;
+    limit?: number;
+  }, EvaluationSample[]>;
+  compare_evaluation_sets: ToolHandler<{
+    baselineSetId: string;
+    candidateSetId: string;
+  }, EvaluationComparison>;
+  suggest_prompt_improvements: ToolHandler<{
+    setId: string;
+    maxScore?: number;
+    limit?: number;
+  }, ImprovementReport>;
+  apply_evaluation_dsl: ToolHandler<{
+    setId: string;
+    dsl: EvaluationDsl;
+    dryRun?: boolean;
+    limit?: number;
+    overwrite?: boolean;
+  }, DslApplicationResult>;
+  ai_rate_evaluation_samples: ToolHandler<{
+    setId: string;
+    limit?: number;
+    overwrite?: boolean;
+    model?: string;
+    timeout?: number;
+  }, AiRateResult>;
+  ai_rewrite_prompt: ToolHandler<{
+    setId: string;
+    maxScore?: number;
+    limit?: number;
+    model?: string;
+    timeout?: number;
+    extraInstructions?: string;
+  }, AiRewriteResult>;
 } {
   return {
     create_evaluation_set: {
@@ -129,6 +197,153 @@ export function registerEvaluationTools(): {
         required: ['setId'],
       },
       handler: async ({ setId }) => getEvaluationSummary(setId),
+    },
+
+    add_evaluation_samples: {
+      description: 'Build an evaluation dataset in one transaction from one seed question and a list of variable sets',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          setId: { type: 'string', description: 'Evaluation set ID' },
+          question: { type: 'string', description: 'Seed question template with {{variables}}' },
+          samples: {
+            type: 'array',
+            description: 'One entry per rendered sample',
+            items: {
+              type: 'object',
+              properties: {
+                answer: { type: 'string', description: 'Model answer to evaluate' },
+                variables: { type: 'object', description: 'Values used to render {{variables}}' },
+                idealAnswer: { type: 'string', description: 'Ideal answer (score mode)' },
+                referenceAnswer: { type: 'string', description: 'Reference answer (GSB mode)' },
+                feedback: { type: 'string', description: 'Optional free-form feedback' },
+              },
+              required: ['answer'],
+            },
+          },
+        },
+        required: ['setId', 'question', 'samples'],
+      },
+      handler: async (input) => addEvaluationSamples(input),
+    },
+
+    list_evaluation_samples: {
+      description: 'List sample details; filter by rating state, low score or GSB verdict to focus on weak cases',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          setId: { type: 'string', description: 'Evaluation set ID' },
+          rated: { type: 'boolean', description: 'true: rated only; false: unrated only' },
+          maxScore: { type: 'number', description: 'Score mode only: samples with score <= this value' },
+          gsb: { type: 'string', enum: ['good', 'same', 'bad'], description: 'GSB mode only: verdict to match' },
+          limit: { type: 'number', description: 'Maximum samples to return (default 100)' },
+        },
+        required: ['setId'],
+      },
+      handler: async ({ setId, ...options }) => listEvaluationSamples(setId, options),
+    },
+
+    compare_evaluation_sets: {
+      description: 'Compare two evaluation sets of the same asset to tell whether a newer version improved',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          baselineSetId: { type: 'string', description: 'Evaluation set ID of the earlier version' },
+          candidateSetId: { type: 'string', description: 'Evaluation set ID of the later version' },
+        },
+        required: ['baselineSetId', 'candidateSetId'],
+      },
+      handler: async ({ baselineSetId, candidateSetId }) =>
+        compareEvaluationSets(baselineSetId, candidateSetId),
+    },
+
+    suggest_prompt_improvements: {
+      description: 'Rule-based, local-only rewrite suggestions from weak samples (no model call)',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          setId: { type: 'string', description: 'Evaluation set ID' },
+          maxScore: {
+            type: 'number',
+            minimum: 1,
+            maximum: 5,
+            description: 'Score mode only: low-score threshold (default 2)',
+          },
+          limit: { type: 'number', description: 'Maximum weak sample IDs to return (default 20)' },
+        },
+        required: ['setId'],
+      },
+      handler: async ({ setId, ...options }) => suggestEvaluationImprovements(setId, options),
+    },
+
+    apply_evaluation_dsl: {
+      description: 'Auto-rate samples with a local rule DSL (first matching rule wins); no model call',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          setId: { type: 'string', description: 'Evaluation set ID' },
+          dsl: {
+            type: 'object',
+            description: 'Ordered rules with `when` conditions plus score/gsb/feedback outcomes, and an optional default',
+            properties: {
+              default: { type: 'object', description: 'Outcome when no rule matches' },
+              rules: {
+                type: 'array',
+                description: 'First matching rule wins',
+                items: {
+                  type: 'object',
+                  properties: {
+                    when: { type: 'string', description: 'Clauses joined by `and`, e.g. "len(answer) >= 40 and answer contains \'SQLite\'"' },
+                    score: { type: 'number', description: '1-5 (score mode)' },
+                    gsb: { type: 'string', enum: ['good', 'same', 'bad'], description: 'GSB mode' },
+                    feedback: { type: 'string', description: 'Optional feedback attached to the rating' },
+                  },
+                  required: ['when'],
+                },
+              },
+            },
+            required: ['rules'],
+          },
+          dryRun: { type: 'boolean', description: 'Return decisions without writing ratings' },
+          limit: { type: 'number', description: 'Maximum samples to inspect (1-1000, default 100)' },
+          overwrite: { type: 'boolean', description: 'Also re-rate already rated samples (default false)' },
+        },
+        required: ['setId', 'dsl'],
+      },
+      handler: async ({ setId, dsl, ...options }) => applyEvaluationDsl(setId, dsl, options),
+    },
+
+    ai_rate_evaluation_samples: {
+      description: 'Rate unrated samples with an AI provider (requires AGENTX_AI_API_KEY); invalid responses are skipped',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          setId: { type: 'string', description: 'Evaluation set ID' },
+          limit: { type: 'number', description: 'Maximum samples to rate (1-100, default 20)' },
+          overwrite: { type: 'boolean', description: 'Also re-rate already rated samples' },
+          model: { type: 'string', description: 'Override the configured model' },
+          timeout: { type: 'number', description: 'Per-sample timeout in ms (default 30000)' },
+        },
+        required: ['setId'],
+      },
+      handler: async ({ setId, ...options }) => aiRateEvaluationSamples(setId, options),
+    },
+
+    ai_rewrite_prompt: {
+      description: 'Ask an AI provider for a rewritten prompt from weak samples (requires AGENTX_AI_API_KEY); never writes back to the asset',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          setId: { type: 'string', description: 'Evaluation set ID' },
+          maxScore: { type: 'number', description: 'Score mode only: low-score threshold (default 2)' },
+          limit: { type: 'number', description: 'Maximum weak samples for context (default 10)' },
+          model: { type: 'string', description: 'Override the configured model' },
+          timeout: { type: 'number', description: 'Request timeout in ms (default 30000)' },
+          extraInstructions: { type: 'string', description: 'Additional rewrite constraints' },
+        },
+        required: ['setId'],
+      },
+      handler: async ({ setId, ...options }) => aiRewritePrompt(setId, options),
     },
   };
 }

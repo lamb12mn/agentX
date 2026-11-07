@@ -36,11 +36,11 @@
 
 ## 2. 工具总览
 
-当前基础模式注册 **66 次、65 个唯一工具名**（15 个注册模块）；增强模式追加 **38 个**，合计 **103 个**。
+当前基础模式注册 **70 次、69 个唯一工具名**（15 个注册模块）；增强模式追加 **38 个**，合计 **107 个**。
 
 `export_agent` 同时定义在 `tools/agents.ts` 与 `tools/export.ts`；`src/index.ts` 按对象展开顺序合并且后者在后，因此**运行时生效的是 `tools/export.ts` 的实现**。
 
-### 2.1 基础工具（65 个唯一名）
+### 2.1 基础工具（69 个唯一名）
 
 | 注册模块 | 数量 | 工具名 |
 |---|---|---|
@@ -55,7 +55,7 @@
 | `tools/batch.ts` | 3 | `batch_delete`, `batch_tag_add`, `batch_tag_remove` |
 | `tools/clone.ts` | 1 | `clone_asset` |
 | `tools/versions.ts` | 6 | `create_version_snapshot`, `list_versions`, `get_version`, `rollback_to_version`, `clear_versions`, `version_stats` |
-| `tools/evaluations.ts` | 5 | `create_evaluation_set`, `list_evaluation_sets`, `add_evaluation_sample`, `rate_evaluation_sample`, `evaluation_summary`（详见第 5 节） |
+| `tools/evaluations.ts` | 9 | `create_evaluation_set`, `list_evaluation_sets`, `add_evaluation_sample`, `add_evaluation_samples`, `list_evaluation_samples`, `rate_evaluation_sample`, `evaluation_summary`, `compare_evaluation_sets`, `suggest_prompt_improvements`（详见第 5 节） |
 | `tools/export.ts` | 2 | `export_agent`, `export_all` |
 | `tools/dependencies.ts` | 5 | `check_dependencies`, `get_dependents`, `get_dependencies`, `get_dependency_graph`, `detect_circular_dependency` |
 | `tools/teams.ts` | 11 | `team.create`, `team.run`, `team.status`, `team.results`, `team.cancel`, `team.list`, `team.history`, `team.logs`, `team.approve`, `team.reject`, `team.pending` |
@@ -126,7 +126,7 @@
 
 ## 4. CLI 对照
 
-`agentx` 共 **25 个顶层命令**（不含 `help`），由 `src/cli.ts` 注册，完整列表以 `agentx --help` 为准。
+`agentx` 共 **26 个顶层命令**（不含 `help`），由 `src/cli.ts` 注册，完整列表以 `agentx --help` 为准。
 
 | 分组 | 命令 |
 |---|---|
@@ -134,7 +134,23 @@
 | 导入导出 | `import`, `export`, `export-all`, `backup`, `restore` |
 | 编排与团队 | `team`（create/run/status/results/cancel/list/history/logs/approve/reject/pending）, `graph` |
 | 批量与 MCP | `batch`, `mcp`（send/inspect）, `proxy`, `init` |
+| 评测 | `evaluation`（snapshot/create/list/add-sample/add-samples/rate/samples/summary/compare/suggest） |
 | 运维 | `doctor`, `audit`, `vault`, `remote`（add/list/remove/pull/push）, `web` |
+
+`evaluation` 组的 9 个子命令与第 5 节评测工具一一对应；`snapshot` 是纯 CLI 前置辅助命令（评测集要求版本快照已存在，此前该能力只有 MCP 工具 `create_version_snapshot`）。全组统一输出 JSON，且不调用 `process.exit()`（失败时打印错误并设置 `process.exitCode = 1`）：
+
+| 子命令 | 位置参数 | 主要选项 | 对应工具 |
+|---|---|---|---|
+| `snapshot` | `<assetId>` | — | `create_version_snapshot`（仅 CLI 辅助） |
+| `create` | `<assetId> <version> <name>` | `--mode score\|gsb`（默认 score）, `--description` | `create_evaluation_set` |
+| `list` | `<assetId>` | `--version` | `list_evaluation_sets` |
+| `add-sample` | `<setId> <question> <answer>` | `--variables <json>`, `--ideal`, `--reference`, `--feedback` | `add_evaluation_sample` |
+| `add-samples` | `<setId> <question> <file>` | 文件为样本 JSON 数组 | `add_evaluation_samples` |
+| `rate` | `<sampleId>` | `--score 1-5` 或 `--gsb good\|same\|bad`, `--feedback` | `rate_evaluation_sample` |
+| `samples` | `<setId>` | `--rated`, `--unrated`, `--max-score`, `--gsb`, `--limit` | `list_evaluation_samples` |
+| `summary` | `<setId>` | — | `evaluation_summary` |
+| `compare` | `<baselineSetId> <candidateSetId>` | — | `compare_evaluation_sets` |
+| `suggest` | `<setId>` | `--max-score`, `--limit` | `suggest_prompt_improvements` |
 
 CLI 不读取 MCP 配置中的 `env`，需单独设置 `AGENTX_DIR` 才能与 MCP 实例访问同一份数据。
 
@@ -166,24 +182,52 @@ CLI 不读取 MCP 配置中的 `env`，需单独设置 `AGENTX_DIR` 才能与 MC
 | `create_evaluation_set` | **assetId**, **version**, **name**, **mode**, description? | `EvaluationSet` |
 | `list_evaluation_sets` | **assetId**, version? | `EvaluationSet[]` |
 | `add_evaluation_sample` | **setId**, **question**, **answer**, variables?, idealAnswer?, referenceAnswer?, feedback? | `EvaluationSample` |
+| `add_evaluation_samples` | **setId**, **question**, **samples**[ ] | `EvaluationSample[]`（单事务） |
+| `list_evaluation_samples` | **setId**, rated?, maxScore?, gsb?, limit? | `EvaluationSample[]` |
 | `rate_evaluation_sample` | **sampleId**, score?, gsb?, feedback? | 更新后的 `EvaluationSample` |
 | `evaluation_summary` | **setId** | `EvaluationSummary` |
+| `compare_evaluation_sets` | **baselineSetId**, **candidateSetId** | `EvaluationComparison` |
+| `suggest_prompt_improvements` | **setId**, maxScore?, limit? | `ImprovementReport` |
+
+`add_evaluation_samples` 的 `samples[]` 每项含必填 `answer`，可选 `variables`、`idealAnswer`、`referenceAnswer`、`feedback`；共用一个 `question` 种子模板，逐条渲染 `{{变量}}`，同一事务写入，任一失败整批回滚，空列表报错。
+`list_evaluation_samples` 默认最多返回 100 条，按录入顺序稳定排列；`maxScore` 仅用于 `score` 模式（取 `score <= maxScore` 的低分样本），`gsb` 仅用于 `gsb` 模式，混用会报错；`rated: true|false` 分别取已评分 / 未评分样本。
 
 返回结构：
 
 - `EvaluationSet`：`id`, `asset_id`, `version`, `name`, `mode`, `description?`, `created_at`
 - `EvaluationSample`：`id`, `set_id`, `question`, `variables`, `rendered_question`, `answer`, `ideal_answer?`, `reference_answer?`, `score?`, `gsb?`, `feedback?`, `created_at`
 - `EvaluationSummary`：`setId`, `assetId`, `version`, `mode`, `total`, `rated`, `averageScore`（`gsb` 模式为 `null`）, `gsb: { good, same, bad }`
+- `EvaluationComparison`：`baseline`, `candidate`（均为 `EvaluationSummary`）, `averageScoreDelta`（仅 `score` 模式）, `gsbNetDelta`（仅 `gsb` 模式，净胜率 `(good - bad) / rated` 之差）, `ratedCoverageDelta`（评分覆盖率差）, `improved`（有评分时按对应模式的差值是否 > 0 判定，否则 `null`）
+- `ImprovementReport`：`setId`, `assetId`, `version`, `mode`, `threshold`（`score` 模式为低分阈值，默认 2；`gsb` 模式为 `null`）, `total`, `weakSampleCount`, `weakSampleIds`（受 `limit` 截断，默认 20）, `insights[]`
 
-### 典型流程
+`compare_evaluation_sets` 要求两个评测集属于**同一资产**且**模式一致**，否则报错；任一侧无有效评分时不臆断结论，`improved` 返回 `null`。
+
+`suggest_prompt_improvements` 是**纯规则诊断**，不调用外部模型：`score` 模式取 `score <= maxScore`（默认 2）的样本为弱样本，`gsb` 模式取 `gsb === 'bad'`；`maxScore` 仅用于 `score` 模式且必须为 1-5 整数，`limit` 必须为正整数。每条 `insight` 含 `code` / `message` / `sampleIds`，按固定顺序输出：
+
+| `code` | 触发条件 | 建议方向 |
+|---|---|---|
+| `weak_samples` | 存在弱样本 | 补充 few-shot 或明确输出约束；GSB 模式对照参照回答 |
+| `unrated_samples` | 存在未评分样本 | 先完成评分再下结论 |
+| `unresolved_variables` | 弱样本的 `rendered_question` 仍含 `{{变量}}` | 补齐缺失的变量取值 |
+| `missing_reference_answer` | 弱样本缺 `idealAnswer` / `referenceAnswer` | 补参照答案，让改写目标可度量 |
+| `weak_sample_feedback` | 弱样本带 `feedback` | 按反馈原文修订 |
+| `variable_concentration` | 某变量取值在弱样本中出现 ≥ 2 次且占比 ≥ 50% | 针对该取值定向补样例 |
+
+无弱样本且无未评分样本时 `insights` 为空数组。
+
+### 典型流程（本地评测闭环）
 
 1. `create_version_snapshot({ assetId })` → 得到 `version`
 2. `create_evaluation_set({ assetId, version, name, mode: 'score' })` → 得到 `setId`
-3. `add_evaluation_sample({ setId, question: '总结 {{topic}}', answer, variables: { topic: 'SQLite' } })` → 得到 `sampleId`
-4. `rate_evaluation_sample({ sampleId, score: 4 })`
-5. `evaluation_summary({ setId })` → 平均分与评分覆盖率；据此改进 Prompt 后创建新快照，重复 2-5
+3. `add_evaluation_samples({ setId, question: '总结 {{topic}}', samples: [{ answer, variables: { topic: 'SQLite' } }, ...] })` → 由种子样本批量构建评测数据集
+4. `rate_evaluation_sample({ sampleId, score })` → 逐条评分
+5. `list_evaluation_samples({ setId, maxScore: 2 })` → 聚焦低分样本明细
+6. `suggest_prompt_improvements({ setId })` → 得到弱样本清单与可操作的改写建议（未渲染变量、缺参照答案、反馈、变量集中等），据此修订 Prompt
+7. `create_version_snapshot({ assetId })` + 新评测集，重复 3-4
+8. `compare_evaluation_sets({ baselineSetId, candidateSetId })` → 判定新版本平均分 / GSB 净胜率是否提升，决定是否采纳
 
-> 错误边界：`version` 不存在、模式不匹配、评分越界、未知 `setId` / `sampleId` 均抛出明确错误，由 MCP 层返回 `isError`。
+> 全程本地 SQLite、本地渲染与规则诊断，不调用外部模型；AI 批量生成变量、AI 智能评分、AI 一键改写等能力不在本实现范围内，`suggest_prompt_improvements` 不会生成新的 Prompt 文本。
+> 错误边界：`version` 不存在、模式不匹配、评分越界、资产/模式不一致、未知 `setId` / `sampleId` 均抛出明确错误，由 MCP 层返回 `isError`。
 
 ---
 
@@ -231,4 +275,4 @@ SQLite（`better-sqlite3`，WAL 模式），`src/store/db.ts` 在 `initDb()` 中
 node scripts/verify-docs.mjs
 ```
 
-该脚本校验版本 / Node 徽章、工具数量、CLI 命令数与文档内所有本地 Markdown 链接。
+该脚本共 10 项校验：版本 / Node 徽章、工具数量与逐项覆盖、分组计数之和、CLI 命令数与文档表格、API 参考工具清单，以及文档内所有本地 Markdown 链接。

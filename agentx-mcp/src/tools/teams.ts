@@ -16,11 +16,14 @@
 
 import { createAsset, getAsset, listAssets, readAssetContent } from '../store/assets.js';
 import { TeamEngine } from '../orchestrator/team-engine.js';
+import { createAiProviderFromEnv } from '../ai/provider.js';
 import type { TeamConfig } from '../types.js';
 
 // ── Shared engine instance ──────────────────────────────────────────────────
+// When AGENTX_AI_API_KEY is set the engine delegates steps to a real model;
+// otherwise TeamEngine keeps its documented local stub fallback.
 
-const engine = new TeamEngine();
+const engine = new TeamEngine({ aiProvider: createAiProviderFromEnv() });
 
 // ── Tool handler interface ──────────────────────────────────────────────────
 

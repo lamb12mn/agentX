@@ -7,6 +7,7 @@ import { getStats } from '../store/pagination.js';
 import { getCacheStats } from '../store/cache.js';
 import { getBaseDir } from '../cli/common.js';
 import { diag } from '../observability/diag.js';
+import { executeWorkflowAsset } from '../orchestrator/workflow-runner.js';
 
 /** REST API 服务器配置 */
 export interface APIConfig {
@@ -366,7 +367,14 @@ export class RESTAPI extends EventEmitter {
     });
 
     this.registerRoute('POST', '/api/workflows/execute', async (req: any) => {
-      return { execution: { id: req.body?.workflowId, status: 'not_implemented', message: 'Execution not yet implemented' } };
+      const input = req.body?.input;
+      if (input !== undefined && (typeof input !== 'object' || input === null || Array.isArray(input))) {
+        throw new Error('input must be a JSON object');
+      }
+      const execution = await executeWorkflowAsset(req.body?.workflowId, input ?? {}, {
+        timeout: req.body?.timeout,
+      });
+      return { execution };
     });
 
     // 统计信息

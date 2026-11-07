@@ -75,6 +75,73 @@ export interface RateEvaluationSampleInput {
   feedback?: string;
 }
 
+/** 批量构建评测集：一个种子提问模板 + 一组变量集，逐条本地渲染 */
+export interface BatchAddEvaluationSamplesInput {
+  setId: string;
+  question: string;
+  samples: Array<{
+    answer: string;
+    variables?: Record<string, unknown>;
+    idealAnswer?: string;
+    referenceAnswer?: string;
+    feedback?: string;
+  }>;
+}
+
+/** 样本明细过滤条件，用于聚焦低分 / 未评分样本 */
+export interface ListEvaluationSamplesOptions {
+  rated?: boolean;
+  maxScore?: number;
+  gsb?: GsbVerdict;
+  limit?: number;
+}
+
+/** 两个版本评测集的对比结果 */
+export interface EvaluationComparison {
+  baseline: EvaluationSummary;
+  candidate: EvaluationSummary;
+  averageScoreDelta: number | null;
+  gsbNetDelta: number | null;
+  ratedCoverageDelta: number;
+  improved: boolean | null;
+}
+
+/** 本地规则诊断出的改写建议类型（不调用外部模型） */
+export type ImprovementInsightCode =
+  | 'weak_samples'
+  | 'unrated_samples'
+  | 'unresolved_variables'
+  | 'missing_reference_answer'
+  | 'weak_sample_feedback'
+  | 'variable_concentration';
+
+export interface ImprovementInsight {
+  code: ImprovementInsightCode;
+  message: string;
+  sampleIds: string[];
+}
+
+/** 改写建议报告：弱样本清单 + 可操作的诊断项 */
+export interface ImprovementReport {
+  setId: string;
+  assetId: string;
+  version: number;
+  mode: EvaluationMode;
+  /** score 模式为低分阈值；GSB 模式为 null */
+  threshold: number | null;
+  total: number;
+  weakSampleCount: number;
+  weakSampleIds: string[];
+  insights: ImprovementInsight[];
+}
+
+export interface SuggestImprovementsOptions {
+  /** score 模式低分阈值，默认 2；GSB 模式不支持 */
+  maxScore?: number;
+  /** weakSampleIds 最大条数，默认 20 */
+  limit?: number;
+}
+
 interface SetRow {
   id: string;
   asset_id: string;
@@ -213,15 +280,7 @@ export function listEvaluationSets(assetId: string, version?: number): Evaluatio
   return rows.map(toSet);
 }
 
-/**
- * 录入样本；question 中的 {{变量}} 用 variables 渲染为 rendered_question
- * @throws 评测集不存在时抛错
- */
-export function addEvaluationSample(input: AddEvaluationSampleInput): EvaluationSample {
-  if (!readSet(input.setId)) {
-    throw new Error(`Evaluation set not found: ${input.setId}`);
-  }
-
+function insertSample(input: AddEvaluationSampleInput): EvaluationSample {
   const variables = input.variables ?? {};
   const sample: EvaluationSample = {
     id: uuidv4(),
@@ -248,6 +307,88 @@ export function addEvaluationSample(input: AddEvaluationSampleInput): Evaluation
   );
 
   return sample;
+}
+
+/**
+ * 录入样本；question 中的 {{变量}} 用 variables 渲染为 rendered_question
+ * @throws 评测集不存在时抛错
+ */
+export function addEvaluationSample(input: AddEvaluationSampleInput): EvaluationSample {
+  if (!readSet(input.setId)) {
+    throw new Error(`Evaluation set not found: ${input.setId}`);
+  }
+  return insertSample(input);
+}
+
+/**
+ * 批量构建评测数据集：一个种子提问模板配一组变量集，逐条本地渲染。
+ * 单事务写入，任一失败整批回滚。
+ * @throws 评测集不存在或样本列表为空时抛错
+ */
+export function addEvaluationSamples(input: BatchAddEvaluationSamplesInput): EvaluationSample[] {
+  if (!readSet(input.setId)) {
+    throw new Error(`Evaluation set not found: ${input.setId}`);
+  }
+  if (input.samples.length === 0) {
+    throw new Error('samples must not be empty');
+  }
+
+  const insert = getDb().transaction((samples: BatchAddEvaluationSamplesInput['samples']) =>
+    samples.map(sample => insertSample({
+      setId: input.setId,
+      question: input.question,
+      answer: sample.answer,
+      variables: sample.variables,
+      idealAnswer: sample.idealAnswer,
+      referenceAnswer: sample.referenceAnswer,
+      feedback: sample.feedback,
+    })));
+
+  return insert(input.samples);
+}
+
+/**
+ * 查询样本明细，可只取已评分 / 未评分样本，或聚焦低分、特定 GSB 判定。
+ * 默认按录入顺序返回，最多 100 条。
+ * @throws 评测集不存在或过滤条件与评测模式冲突时抛错
+ */
+export function listEvaluationSamples(
+  setId: string,
+  options: ListEvaluationSamplesOptions = {},
+): EvaluationSample[] {
+  const set = readSet(setId);
+  if (!set) {
+    throw new Error(`Evaluation set not found: ${setId}`);
+  }
+  if (options.maxScore !== undefined && set.mode !== 'score') {
+    throw new Error('maxScore is only supported in score mode');
+  }
+  if (options.gsb !== undefined && set.mode !== 'gsb') {
+    throw new Error('gsb filter is only supported in GSB mode');
+  }
+
+  const clauses = ['set_id = ?'];
+  const params: Array<string | number> = [setId];
+  if (options.rated === true) {
+    clauses.push(set.mode === 'score' ? 'score IS NOT NULL' : 'gsb IS NOT NULL');
+  } else if (options.rated === false) {
+    clauses.push(set.mode === 'score' ? 'score IS NULL' : 'gsb IS NULL');
+  }
+  if (options.maxScore !== undefined) {
+    clauses.push('score <= ?');
+    params.push(options.maxScore);
+  }
+  if (options.gsb !== undefined) {
+    clauses.push('gsb = ?');
+    params.push(options.gsb);
+  }
+
+  const limit = options.limit ?? 100;
+  params.push(limit);
+  const rows = getDb().prepare(
+    `SELECT * FROM evaluation_samples WHERE ${clauses.join(' AND ')} ORDER BY created_at ASC, rowid ASC LIMIT ?`
+  ).all(...params) as SampleRow[];
+  return rows.map(toSample);
 }
 
 /**
@@ -309,5 +450,175 @@ export function getEvaluationSummary(setId: string): EvaluationSummary {
       ? scores.reduce((sum, s) => sum + s, 0) / scores.length
       : null,
     gsb,
+  };
+}
+
+/** GSB 净胜率：好于参照的比例减去差于参照的比例，取值 [-1, 1]；仅 GSB 模式有意义 */
+function gsbNet(summary: EvaluationSummary): number | null {
+  if (summary.mode !== 'gsb' || summary.rated === 0) return null;
+  return (summary.gsb.good - summary.gsb.bad) / summary.rated;
+}
+
+function coverage(summary: EvaluationSummary): number {
+  return summary.total === 0 ? 0 : summary.rated / summary.total;
+}
+
+/**
+ * 对比同一资产的两个评测集（通常为前后两个版本），判断优化是否带来提升。
+ * 要求资产与评测模式一致；未产生评分的一侧返回 null 指标，不臆断结论。
+ * @throws 评测集不存在、资产不一致或模式不一致时抛错
+ */
+export function compareEvaluationSets(
+  baselineSetId: string,
+  candidateSetId: string,
+): EvaluationComparison {
+  const baselineSet = readSet(baselineSetId);
+  const candidateSet = readSet(candidateSetId);
+  if (!baselineSet) throw new Error(`Evaluation set not found: ${baselineSetId}`);
+  if (!candidateSet) throw new Error(`Evaluation set not found: ${candidateSetId}`);
+  if (baselineSet.asset_id !== candidateSet.asset_id) {
+    throw new Error('Evaluation sets must belong to the same asset');
+  }
+  if (baselineSet.mode !== candidateSet.mode) {
+    throw new Error('Evaluation sets must use the same mode');
+  }
+
+  const baseline = getEvaluationSummary(baselineSetId);
+  const candidate = getEvaluationSummary(candidateSetId);
+  const averageScoreDelta = baseline.averageScore !== null && candidate.averageScore !== null
+    ? candidate.averageScore - baseline.averageScore
+    : null;
+  const baselineNet = gsbNet(baseline);
+  const candidateNet = gsbNet(candidate);
+  const gsbNetDelta = baselineNet !== null && candidateNet !== null
+    ? candidateNet - baselineNet
+    : null;
+
+  const signal = baseline.mode === 'score' ? averageScoreDelta : gsbNetDelta;
+  return {
+    baseline,
+    candidate,
+    averageScoreDelta,
+    gsbNetDelta,
+    ratedCoverageDelta: coverage(candidate) - coverage(baseline),
+    improved: signal === null ? null : signal > 0,
+  };
+}
+
+/**
+ * 基于弱样本生成可操作的改写建议：纯本地规则诊断，不调用外部模型。
+ * score 模式聚焦 score <= maxScore（默认 2）的样本，GSB 模式聚焦 bad 判定。
+ * @throws 评测集不存在或选项非法时抛错
+ */
+export function suggestEvaluationImprovements(
+  setId: string,
+  options: SuggestImprovementsOptions = {},
+): ImprovementReport {
+  const set = readSet(setId);
+  if (!set) throw new Error(`Evaluation set not found: ${setId}`);
+
+  const limit = options.limit ?? 20;
+  if (!Number.isInteger(limit) || limit <= 0) {
+    throw new Error('limit must be a positive integer');
+  }
+  let threshold: number | null = null;
+  if (set.mode === 'score') {
+    threshold = options.maxScore ?? 2;
+    if (!Number.isInteger(threshold) || threshold < 1 || threshold > 5) {
+      throw new Error('maxScore must be an integer between 1 and 5');
+    }
+  } else if (options.maxScore !== undefined) {
+    throw new Error('maxScore is only supported in score mode');
+  }
+
+  const rows = getDb().prepare(
+    'SELECT * FROM evaluation_samples WHERE set_id = ? ORDER BY created_at ASC, rowid ASC'
+  ).all(setId) as SampleRow[];
+  const samples = rows.map(toSample);
+  const isRated = (sample: EvaluationSample) =>
+    set.mode === 'score' ? sample.score !== undefined : sample.gsb !== undefined;
+  const weak = set.mode === 'score'
+    ? samples.filter(s => s.score !== undefined && threshold !== null && s.score <= threshold)
+    : samples.filter(s => s.gsb === 'bad');
+  const unrated = samples.filter(s => !isRated(s));
+  const ids = (list: EvaluationSample[]) => list.map(s => s.id);
+
+  const insights: ImprovementInsight[] = [];
+  if (weak.length > 0) {
+    insights.push({
+      code: 'weak_samples',
+      message: set.mode === 'score'
+        ? `${weak.length} sample(s) scored <= ${threshold}; add few-shot examples or clarify output constraints for these cases.`
+        : `${weak.length} sample(s) rated bad against the reference; compare answer with reference_answer before rewriting.`,
+      sampleIds: ids(weak),
+    });
+  }
+  if (unrated.length > 0) {
+    insights.push({
+      code: 'unrated_samples',
+      message: `${unrated.length} sample(s) are still unrated; complete the ratings before drawing conclusions.`,
+      sampleIds: ids(unrated),
+    });
+  }
+
+  const unresolved = weak.filter(s => /\{\{\s*[\w.]+\s*\}\}/.test(s.rendered_question));
+  if (unresolved.length > 0) {
+    insights.push({
+      code: 'unresolved_variables',
+      message: `${unresolved.length} weak sample(s) still contain unresolved {{variables}}; supply the missing variable values.`,
+      sampleIds: ids(unresolved),
+    });
+  }
+
+  const missingReference = weak.filter(s =>
+    set.mode === 'score' ? !s.ideal_answer : !s.reference_answer);
+  if (missingReference.length > 0) {
+    insights.push({
+      code: 'missing_reference_answer',
+      message: `${missingReference.length} weak sample(s) lack an ${set.mode === 'score' ? 'idealAnswer' : 'referenceAnswer'}; add one to make the rewrite target measurable.`,
+      sampleIds: ids(missingReference),
+    });
+  }
+
+  const feedback = [...new Set(weak.map(s => s.feedback).filter((f): f is string => !!f))];
+  if (feedback.length > 0) {
+    insights.push({
+      code: 'weak_sample_feedback',
+      message: `Feedback on weak samples: ${feedback.map(f => `"${f}"`).join('; ')}.`,
+      sampleIds: ids(weak.filter(s => !!s.feedback)),
+    });
+  }
+
+  const occurrences = new Map<string, { key: string; value: unknown; ids: string[] }>();
+  for (const sample of weak) {
+    for (const [key, value] of Object.entries(sample.variables)) {
+      const token = `${key}=${JSON.stringify(value)}`;
+      const entry = occurrences.get(token) ?? { key, value, ids: [] };
+      entry.ids.push(sample.id);
+      occurrences.set(token, entry);
+    }
+  }
+  const concentrated = [...occurrences.values()]
+    .filter(entry => entry.ids.length >= 2 && entry.ids.length / weak.length >= 0.5)
+    .sort((a, b) => b.ids.length - a.ids.length)[0];
+  if (concentrated) {
+    const shown = JSON.stringify(concentrated.value) ?? String(concentrated.value);
+    insights.push({
+      code: 'variable_concentration',
+      message: `Variable "${concentrated.key}" = ${shown} appears in ${concentrated.ids.length} of ${weak.length} weak samples; consider targeted examples for this case.`,
+      sampleIds: concentrated.ids,
+    });
+  }
+
+  return {
+    setId: set.id,
+    assetId: set.asset_id,
+    version: set.version,
+    mode: set.mode,
+    threshold,
+    total: samples.length,
+    weakSampleCount: weak.length,
+    weakSampleIds: weak.slice(0, limit).map(s => s.id),
+    insights,
   };
 }

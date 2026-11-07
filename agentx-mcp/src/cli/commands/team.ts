@@ -19,10 +19,11 @@ import chalk from 'chalk';
 import { readFile } from 'fs/promises';
 import { createAsset, listAssets, readAssetContent } from '../../store/assets.js';
 import { TeamEngine } from '../../orchestrator/team-engine.js';
+import { createAiProviderFromEnv } from '../../ai/provider.js';
 import type { TeamConfig } from '../../types.js';
 import { withDb } from '../common.js';
 
-const engine = new TeamEngine();
+const engine = new TeamEngine({ aiProvider: createAiProviderFromEnv() });
 
 function success(msg: string): void {
   console.log(chalk.green('✓'), msg);

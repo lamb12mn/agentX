@@ -64,6 +64,37 @@
 
 ---
 
+## 提交信息规范
+
+一律使用 [Conventional Commits](https://www.conventionalcommits.org/)。完整格式、type 定义与示例以 [`CONTRIBUTING.md` 的「提交信息规范」](CONTRIBUTING.md) 为准，本节只列代理执行要点。
+
+```
+<type>(<scope>): <subject>
+
+<body>
+
+<footer>
+```
+
+- **type**：只用 `feat` / `fix` / `docs` / `style` / `refactor` / `test` / `chore`，不使用其它值。
+- **scope**：可省略；仓库现有提交多数省略。需要时用模块名（如 `evaluation`、`cli`、`store`）。
+- **subject**：仓库实际以中文为主；一句话说清改动，不用 `wip`、`fixed bug`、`updated stuff` 这类含糊表述。
+- **body / footer**：可选；跨模块改动或有破坏性变更时补充。
+
+示例（贴合仓库实际惯例）：
+
+```bash
+feat(evaluation): 新增本地 Prompt 评测集与评分工具
+fix(api): 修复鉴权失败时请求挂起
+docs: 同步 README 工具清单与 API 参考
+```
+
+代理执行约束：
+- 仅在用户明确要求时才执行 `git commit`，不要顺手提交。
+- 提交前跑 `npm run typecheck`、`npm run lint`、`npm test`；并复核暂存区，会话前既有改动与本次改动分开说明，不把无关改动带入。
+
+---
+
 <!-- CODEGRAPH_START -->
 ## CodeGraph
 
