@@ -43,7 +43,7 @@ describe('evaluation tools', () => {
 
   // ── Tool surface ────────────────────────────────────────────────────────
 
-  it('registers the ten evaluation tools', () => {
+  it('registers the fourteen evaluation tools', () => {
     expect(Object.keys(tools)).toEqual([
       'create_evaluation_set',
       'list_evaluation_sets',
@@ -55,6 +55,10 @@ describe('evaluation tools', () => {
       'compare_evaluation_sets',
       'suggest_prompt_improvements',
       'apply_evaluation_dsl',
+      'ai_rate_evaluation_samples',
+      'ai_rewrite_prompt',
+      'ai_generate_evaluation_samples',
+      'apply_prompt_rewrite',
     ]);
   });
 

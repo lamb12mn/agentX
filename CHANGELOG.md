@@ -18,8 +18,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `suggest_prompt_improvements`：基于弱样本的纯规则诊断，输出未评分、未渲染变量、缺参照答案、低分反馈、变量取值集中等可操作建议
   - CLI `evaluation` 命令组：9 个子命令与评测 MCP 工具一一对应，另加 `snapshot` 前置辅助命令，使纯 CLI 也能创建版本快照；统一 JSON 输出、失败不调用 `process.exit()`
   - 新增 6 个评测工具测试与 4 个 CLI 端到端测试，覆盖两种模式、阈值/上限校验与错误边界
+- 本地评分 DSL、AI 评测与工作流执行（第 3-5 轮迭代，零新依赖）：
+  - `apply_evaluation_dsl`：本地规则 DSL（字段 / `len()` / 比较 / `contains` / `and`）按首条命中规则批量打分，支持 `dryRun`、`overwrite`、`limit`；纯本地、不调用模型
+  - `ai_rate_evaluation_samples` / `ai_rewrite_prompt`：可选 AI 能力，需 `AGENTX_AI_API_KEY`；未配置时抛 `AiProviderNotConfiguredError` 而非伪造结果，AI 改写只返回候选文本、不写回资产
+  - `createAiProviderFromEnv()` 为 MCP / CLI / REST 三处的 `TeamEngine` 注入真实 provider；未配置时保留带 `simulated: true` 的 stub 兜底（有意设计，不删除）
+  - `POST /api/workflows/execute` 接入 `orchestrator/workflow-runner.ts`，支持完整 `TeamConfig`、`{ steps }` 与顶层步骤数组三种 YAML 形态，返回完整执行结果
+  - CLI `evaluation` 新增 `apply-dsl` / `ai-rate` / `ai-rewrite`；新增 4 个测试文件（AI provider、工作流执行、DSL、AI 评测）及 CLI 端到端用例
+- 评测闭环收尾（第 6 轮迭代，对照 PromptPilot「AI 批量生成变量」与「形成优化后的新版本」）：
+  - `ai_generate_evaluation_samples`：以种子样本为 few-shot，由真实 provider 批量生成 `{{变量}}` 取值，本地渲染后以版本快照 Prompt 跑出回答，单事务写入未评分样本；支持 `dryRun`、`generateAnswers: false`、`count`、去重与逐条错误隔离；未配置 provider 时明确报错
+  - `apply_prompt_rewrite`：把改写候选显式落成新版本——更新资产、创建版本快照、创建绑定新版本的评测集；传入候选文本可完全离线，`dryRun` 不落盘
+  - MCP 工具 `ai_generate_evaluation_samples` / `apply_prompt_rewrite`，CLI 子命令 `ai-generate` / `apply-rewrite`；新增 9 个测试用例覆盖变量渲染、回答生成、去重、dryRun、离线应用与版本绑定
+  - 文档同步为 74 个基础工具（合计 112）、14 个评测工具与 14 个 `evaluation` 子命令
+- 评分 DSL 布尔表达式（第 7 轮迭代，零新依赖）：
+  - `when` 条件支持 `or` 与 `()` 分组（`and` 优先级更高）；新增轻量词法器 + 递归下降解析器，引号内的空格与 `and` / `or` 字样不再被误切
+  - 导出 `parseCondition()` / `DslCondition`；`parseExpression()` 保留扁平 `and` 链视图以兼容既有调用，遇到 `or` / 括号时明确提示改用 `parseCondition()`
+  - 括号不匹配、悬空逻辑词、未闭合引号、空分组均抛出明确错误；新增 4 个测试用例（含 1 条端到端写库）
 
 ### Changed
+
+- README / API_REFERENCE: 工具数同步为 74 个基础工具 + 38 个增强工具（合计 112）、14 个评测工具、26 个顶层 CLI 命令；补入 AI 环境变量、DSL 语法、AI 边界、数据集扩充与新版本落地说明
+- scripts: `verify-docs.mjs` 增加 AI 环境变量覆盖与 `not_implemented` 残留校验（共 12 项）
+- MCP 层错误响应：在通用建议中附带真实错误原因，避免 `AiProviderNotConfiguredError` 等具体信息被固定标题吞掉
+- tests: MCP Server 集成测试改用 `process.execPath` 启动子进程，避免 PATH 上的 Node 与 `better-sqlite3` 原生模块 ABI 不匹配
 
 - README / API_REFERENCE: 工具数同步为 69 个基础工具 + 38 个增强工具、26 个 CLI 命令，补入改写建议报告与 `evaluation` 子命令对照表
 - scripts: `verify-docs.mjs` 增加「工具分组计数之和与源码一致」校验（共 10 项）

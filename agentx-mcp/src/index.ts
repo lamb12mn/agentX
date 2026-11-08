@@ -439,7 +439,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         text: formatError(err instanceof Error ? err : message, {
           code: ErrorCode.ASSET_CREATE_FAILED,
           tool: name,
-          suggestion: 'Check the input parameters and try again',
+          suggestion: `Check the input parameters and try again. Cause: ${message}`,
         }),
       }],
       isError: true,

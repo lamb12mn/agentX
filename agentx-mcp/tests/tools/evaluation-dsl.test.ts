@@ -6,7 +6,7 @@ import { initDb, closeDb } from '../../src/store/db.js';
 import { createAsset } from '../../src/store/assets.js';
 import { createVersionSnapshot } from '../../src/store/versions.js';
 import { registerEvaluationTools } from '../../src/tools/evaluations.js';
-import { parseExpression, matchesExpression } from '../../src/store/evaluation-dsl.js';
+import { parseCondition, parseExpression, matchesExpression } from '../../src/store/evaluation-dsl.js';
 import type { EvaluationMode } from '../../src/types.js';
 
 describe('local scoring DSL', () => {
@@ -80,6 +80,48 @@ describe('local scoring DSL', () => {
     expect(check('answer = nope')).toBe(false);
   });
 
+  it('parses or-chains, parentheses and and-over-or precedence', () => {
+    expect(parseCondition("answer contains 'SQLite' or answer contains 'WAL'")).toEqual({
+      kind: 'or',
+      children: [
+        { kind: 'clause', clause: { field: 'answer', op: 'contains', value: 'SQLite' } },
+        { kind: 'clause', clause: { field: 'answer', op: 'contains', value: 'WAL' } },
+      ],
+    });
+
+    expect(parseCondition('rated = false or score = 5 and len(answer) > 10')).toMatchObject({
+      kind: 'or', children: [{ kind: 'clause' }, { kind: 'and' }],
+    });
+    expect(parseCondition('(rated = false or score = 5) and len(answer) > 10')).toMatchObject({
+      kind: 'and', children: [{ kind: 'or' }, { kind: 'clause' }],
+    });
+  });
+
+  it('keeps quoted values containing spaces and logical words intact', () => {
+    expect(parseExpression("answer contains 'SQLite and WAL' and variables.topic = 'or'")).toEqual([
+      { field: 'answer', op: 'contains', value: 'SQLite and WAL' },
+      { field: 'variables.topic', op: '=', value: 'or' },
+    ]);
+    const sample = {
+      id: 's', set_id: 'set', question: 'q', variables: {},
+      rendered_question: 'q', answer: 'SQLite and WAL are both fine',
+      score: undefined, created_at: 1,
+    };
+    expect(matchesExpression(parseCondition("answer contains 'SQLite and WAL'"), sample)).toBe(true);
+    expect(matchesExpression(parseCondition("answer contains 'WAL' or answer contains 'MySQL'"), sample)).toBe(true);
+  });
+
+  it('rejects malformed boolean conditions', () => {
+    expect(() => parseCondition('   ')).toThrow(/non-empty/);
+    expect(() => parseCondition('answer = 1 and')).toThrow(/Incomplete/);
+    expect(() => parseCondition('(answer = 1')).toThrow(/Unmatched "\("/);
+    expect(() => parseCondition('answer = 1)')).toThrow(/Unexpected token/);
+    expect(() => parseCondition('answer = 1 or or score = 2')).toThrow(/Unexpected "or"/);
+    expect(() => parseCondition("answer contains 'unclosed")).toThrow(/Unterminated quote/);
+    expect(() => parseCondition('()')).toThrow(/Unmatched "\)"/);
+    expect(() => parseExpression('answer = 1 or answer = 2')).toThrow(/only supports `and` chains/);
+  });
+
   // ── Applying the DSL ────────────────────────────────────────────────────
 
   it('applies the first matching rule and writes ratings', async () => {
@@ -104,6 +146,30 @@ describe('local scoring DSL', () => {
     const summary = await tools.evaluation_summary.handler({ setId });
     expect(summary.averageScore).toBe(3);
     expect(summary.rated).toBe(2);
+  });
+
+  it('applies rules combining or and parentheses end to end', async () => {
+    const setId = await makeSet();
+    await addSample(setId, 'short');
+    await addSample(setId, 'A detailed explanation of SQLite indexing and WAL mode');
+    await addSample(setId, 'A detailed explanation of Postgres indexing and MVCC mode');
+
+    const result = await tools.apply_evaluation_dsl.handler({
+      setId,
+      dsl: {
+        default: { score: 3 },
+        rules: [
+          { when: "len(answer) < 40 or answer !contains 'mode'", score: 1 },
+          { when: "(answer contains 'SQLite' or answer contains 'Postgres') and len(answer) >= 40", score: 5 },
+        ],
+      },
+    });
+
+    expect(result).toMatchObject({ mode: 'score', evaluated: 3, matched: 3, written: 3 });
+    expect(result.decisions.map(d => d.score)).toEqual([1, 5, 5]);
+    expect(result.decisions.map(d => d.ruleIndex)).toEqual([0, 1, 1]);
+    const summary = await tools.evaluation_summary.handler({ setId });
+    expect(summary.averageScore).toBeCloseTo(11 / 3);
   });
 
   it('uses the default when no rule matches and skips samples without one', async () => {
@@ -205,8 +271,8 @@ describe('local scoring DSL', () => {
     })).rejects.toThrow(/Evaluation set not found/);
   });
 
-  it('registers apply_evaluation_dsl as the tenth evaluation tool', () => {
-    expect(Object.keys(tools)).toHaveLength(10);
+  it('registers apply_evaluation_dsl alongside the AI tools', () => {
+    expect(Object.keys(tools)).toHaveLength(14);
     expect(tools.apply_evaluation_dsl.inputSchema.required).toEqual(['setId', 'dsl']);
   });
 });

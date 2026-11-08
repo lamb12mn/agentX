@@ -36,11 +36,11 @@
 
 ## 2. 工具总览
 
-当前基础模式注册 **70 次、69 个唯一工具名**（15 个注册模块）；增强模式追加 **38 个**，合计 **107 个**。
+当前基础模式注册 **73 次、72 个唯一工具名**（15 个注册模块）；增强模式追加 **38 个**，合计 **110 个**。
 
 `export_agent` 同时定义在 `tools/agents.ts` 与 `tools/export.ts`；`src/index.ts` 按对象展开顺序合并且后者在后，因此**运行时生效的是 `tools/export.ts` 的实现**。
 
-### 2.1 基础工具（69 个唯一名）
+### 2.1 基础工具（72 个唯一名）
 
 | 注册模块 | 数量 | 工具名 |
 |---|---|---|
@@ -55,7 +55,7 @@
 | `tools/batch.ts` | 3 | `batch_delete`, `batch_tag_add`, `batch_tag_remove` |
 | `tools/clone.ts` | 1 | `clone_asset` |
 | `tools/versions.ts` | 6 | `create_version_snapshot`, `list_versions`, `get_version`, `rollback_to_version`, `clear_versions`, `version_stats` |
-| `tools/evaluations.ts` | 9 | `create_evaluation_set`, `list_evaluation_sets`, `add_evaluation_sample`, `add_evaluation_samples`, `list_evaluation_samples`, `rate_evaluation_sample`, `evaluation_summary`, `compare_evaluation_sets`, `suggest_prompt_improvements`（详见第 5 节） |
+| `tools/evaluations.ts` | 14 | `create_evaluation_set`, `list_evaluation_sets`, `add_evaluation_sample`, `add_evaluation_samples`, `list_evaluation_samples`, `rate_evaluation_sample`, `evaluation_summary`, `compare_evaluation_sets`, `suggest_prompt_improvements`, `apply_evaluation_dsl`, `ai_rate_evaluation_samples`, `ai_rewrite_prompt`, `ai_generate_evaluation_samples`, `apply_prompt_rewrite`（详见第 5 节） |
 | `tools/export.ts` | 2 | `export_agent`, `export_all` |
 | `tools/dependencies.ts` | 5 | `check_dependencies`, `get_dependents`, `get_dependencies`, `get_dependency_graph`, `detect_circular_dependency` |
 | `tools/teams.ts` | 11 | `team.create`, `team.run`, `team.status`, `team.results`, `team.cancel`, `team.list`, `team.history`, `team.logs`, `team.approve`, `team.reject`, `team.pending` |
@@ -117,8 +117,9 @@
 
 ### 3.4 已知限制
 
-- `POST /api/workflows/execute` 固定返回 `status: 'not_implemented'`，尚未接入真实工作流执行引擎。
-- `TeamEngine`（`src/orchestrator/team-engine.ts`）已具备 `AiProvider` 接口、模板渲染与执行会话持久化，但**未注入 AiProvider 时仍回退到 `stubAgentExecution()`**，输出带 `[Stub]` 前缀。
+- `POST /api/workflows/execute` 已接入 `src/orchestrator/workflow-runner.ts`：读取 workflow 资产的 YAML/JSON（支持完整 `TeamConfig`、`{ steps: [...] }` 或顶层步骤数组），由 `TeamEngine` 同步执行并返回完整结果。默认不写会话表，返回中的 `simulated` 标记是否走了本地 stub。
+- `TeamEngine` 的执行优先级为 human → sub-team → agentHandler → `AiProvider` → `AIAssistant` → stub。设置 `AGENTX_AI_API_KEY`（可选 `AGENTX_AI_BASE_URL` / `AGENTX_AI_MODEL`）后，`createAiProviderFromEnv()` 会把真实 provider 注入 MCP / CLI / REST 三处；未配置时保留带 `simulated: true` 的 `[Stub]` 兜底，结果明确标记未做真实工作。
+- AI 评测工具（`ai_rate_evaluation_samples` / `ai_rewrite_prompt` / `ai_generate_evaluation_samples`）在无 provider 时抛 `AiProviderNotConfiguredError`，不会静默伪造评分或样本；AI 改写只返回候选文本，只有显式调用 `apply_prompt_rewrite` 才会写回资产、创建版本快照并绑定新评测集。
 - REST API 需在增强模式下调用 `api.start`（或由 `main()` 自动启动）；未设置 `AGENTX_API_KEY` 时认证关闭，仅 `/health` 默认公开。
 - `better-sqlite3` 是原生模块，切换 Node 主版本后须 `npm rebuild better-sqlite3`，否则 `initDb()` 会直接失败。
 
@@ -134,10 +135,10 @@
 | 导入导出 | `import`, `export`, `export-all`, `backup`, `restore` |
 | 编排与团队 | `team`（create/run/status/results/cancel/list/history/logs/approve/reject/pending）, `graph` |
 | 批量与 MCP | `batch`, `mcp`（send/inspect）, `proxy`, `init` |
-| 评测 | `evaluation`（snapshot/create/list/add-sample/add-samples/rate/samples/summary/compare/suggest） |
+| 评测 | `evaluation`（snapshot/create/list/add-sample/add-samples/rate/samples/summary/compare/suggest/apply-dsl/ai-rate/ai-rewrite/ai-generate/apply-rewrite） |
 | 运维 | `doctor`, `audit`, `vault`, `remote`（add/list/remove/pull/push）, `web` |
 
-`evaluation` 组的 9 个子命令与第 5 节评测工具一一对应；`snapshot` 是纯 CLI 前置辅助命令（评测集要求版本快照已存在，此前该能力只有 MCP 工具 `create_version_snapshot`）。全组统一输出 JSON，且不调用 `process.exit()`（失败时打印错误并设置 `process.exitCode = 1`）：
+`evaluation` 组的 14 个子命令与第 5 节评测工具一一对应；`snapshot` 是纯 CLI 前置辅助命令（评测集要求版本快照已存在，此前该能力只有 MCP 工具 `create_version_snapshot`）。全组统一输出 JSON，且不调用 `process.exit()`（失败时打印错误并设置 `process.exitCode = 1`）。`ai-rate` / `ai-rewrite` / `ai-generate` 需要 `AGENTX_AI_API_KEY`，未配置时直接报错；`apply-rewrite` 传入候选文本或候选 JSON 文件时可完全离线：
 
 | 子命令 | 位置参数 | 主要选项 | 对应工具 |
 |---|---|---|---|
@@ -151,6 +152,11 @@
 | `summary` | `<setId>` | — | `evaluation_summary` |
 | `compare` | `<baselineSetId> <candidateSetId>` | — | `compare_evaluation_sets` |
 | `suggest` | `<setId>` | `--max-score`, `--limit` | `suggest_prompt_improvements` |
+| `apply-dsl` | `<setId> <file>` | `--dry-run`, `--limit`, `--overwrite` | `apply_evaluation_dsl` |
+| `ai-rate` | `<setId>` | `--limit`, `--overwrite`, `--model`, `--timeout` | `ai_rate_evaluation_samples` |
+| `ai-rewrite` | `<setId>` | `--max-score`, `--limit`, `--model`, `--timeout`, `--instructions` | `ai_rewrite_prompt` |
+| `ai-generate` | `<setId>` | `--count`, `--question`, `--no-answers`, `--dry-run`, `--model`, `--timeout`, `--instructions` | `ai_generate_evaluation_samples` |
+| `apply-rewrite` | `<setId> [file]` | `--rewritten-prompt`, `--dry-run`, `--name`, `--description`, `--max-score`, `--limit`, `--model`, `--timeout`, `--instructions` | `apply_prompt_rewrite` |
 
 CLI 不读取 MCP 配置中的 `env`，需单独设置 `AGENTX_DIR` 才能与 MCP 实例访问同一份数据。
 
@@ -159,7 +165,12 @@ CLI 不读取 MCP 配置中的 `env`，需单独设置 `AGENTX_DIR` 才能与 MC
 ## 5. Prompt 评测工具
 
 本地评测闭环：评测集绑定某个资产的**版本快照**，样本记录「提问 + 回答 + 评分结果」，
-用于量化版本质量并驱动迭代。全程本地 SQLite 存储，不调用外部模型。
+用于量化版本质量并驱动迭代。默认全程本地 SQLite 存储、不调用外部模型：
+`apply_evaluation_dsl` 用本地规则自动打分，`suggest_prompt_improvements` 用规则诊断。
+只有 `ai_rate_evaluation_samples` / `ai_rewrite_prompt` / `ai_generate_evaluation_samples`
+会调用外部模型，且必须设置 `AGENTX_AI_API_KEY`；未配置时抛
+`AiProviderNotConfiguredError`，不会静默伪造结果。`apply_prompt_rewrite` 是本地写操作：
+显式传入候选文本时不调用模型。
 
 - 表：`evaluation_sets`、`evaluation_samples`（由 `initDb` 幂等创建）
 - 版本：复用 `versions` 表，需先调用 `create_version_snapshot`
@@ -188,6 +199,11 @@ CLI 不读取 MCP 配置中的 `env`，需单独设置 `AGENTX_DIR` 才能与 MC
 | `evaluation_summary` | **setId** | `EvaluationSummary` |
 | `compare_evaluation_sets` | **baselineSetId**, **candidateSetId** | `EvaluationComparison` |
 | `suggest_prompt_improvements` | **setId**, maxScore?, limit? | `ImprovementReport` |
+| `apply_evaluation_dsl` | **setId**, **dsl**, dryRun?, limit?, overwrite? | `DslApplicationResult` |
+| `ai_rate_evaluation_samples` | **setId**, limit?, overwrite?, model?, timeout? | `AiRateResult` |
+| `ai_rewrite_prompt` | **setId**, maxScore?, limit?, model?, timeout?, extraInstructions? | `AiRewriteResult` |
+| `ai_generate_evaluation_samples` | **setId**, count?, question?, generateAnswers?, dryRun?, model?, timeout?, instructions? | `AiGenerateSamplesResult` |
+| `apply_prompt_rewrite` | **setId**, rewrittenPrompt?, maxScore?, limit?, model?, timeout?, extraInstructions?, name?, description?, dryRun? | `ApplyRewriteResult` |
 
 `add_evaluation_samples` 的 `samples[]` 每项含必填 `answer`，可选 `variables`、`idealAnswer`、`referenceAnswer`、`feedback`；共用一个 `question` 种子模板，逐条渲染 `{{变量}}`，同一事务写入，任一失败整批回滚，空列表报错。
 `list_evaluation_samples` 默认最多返回 100 条，按录入顺序稳定排列；`maxScore` 仅用于 `score` 模式（取 `score <= maxScore` 的低分样本），`gsb` 仅用于 `gsb` 模式，混用会报错；`rated: true|false` 分别取已评分 / 未评分样本。
@@ -199,6 +215,11 @@ CLI 不读取 MCP 配置中的 `env`，需单独设置 `AGENTX_DIR` 才能与 MC
 - `EvaluationSummary`：`setId`, `assetId`, `version`, `mode`, `total`, `rated`, `averageScore`（`gsb` 模式为 `null`）, `gsb: { good, same, bad }`
 - `EvaluationComparison`：`baseline`, `candidate`（均为 `EvaluationSummary`）, `averageScoreDelta`（仅 `score` 模式）, `gsbNetDelta`（仅 `gsb` 模式，净胜率 `(good - bad) / rated` 之差）, `ratedCoverageDelta`（评分覆盖率差）, `improved`（有评分时按对应模式的差值是否 > 0 判定，否则 `null`）
 - `ImprovementReport`：`setId`, `assetId`, `version`, `mode`, `threshold`（`score` 模式为低分阈值，默认 2；`gsb` 模式为 `null`）, `total`, `weakSampleCount`, `weakSampleIds`（受 `limit` 截断，默认 20）, `insights[]`
+- `DslApplicationResult`：`setId`, `mode`, `evaluated`（检查样本数）, `matched`（命中规则或 default 的数）, `written`（实际写回数）, `dryRun`, `decisions[]`（`sampleId`, `ruleIndex` — 命中规则下标，default 为 `null`, `score?` / `gsb?`, `feedback?`）
+- `AiRateResult`：`setId`, `mode`, `evaluated`, `rated`, `failed`, `results[]`（`sampleId` + 评分）, `errors[]`（`sampleId`, `error`）
+- `AiRewriteResult`：`setId`, `assetId`, `version`, `mode`, `currentPrompt`, `rewrittenPrompt`, `rationale`, `weakSampleCount`, `weakSampleIds`, `insightCodes`, `applied`（恒为 `false`）
+- `AiGenerateSamplesResult`：`setId`, `mode`, `question`, `variableKeys`, `requested`, `generated`, `created`, `dryRun`, `samples[]`（`variables`, `renderedQuestion`, `answer`）, `errors[]`
+- `ApplyRewriteResult`：`baselineSetId`, `assetId`, `previousVersion`, `rewrittenPrompt`, `rationale`, `version`（`dryRun` 为 `null`）, `evaluationSetId`（`dryRun` 为 `null`）, `applied`
 
 `compare_evaluation_sets` 要求两个评测集属于**同一资产**且**模式一致**，否则报错；任一侧无有效评分时不臆断结论，`improved` 返回 `null`。
 
@@ -215,19 +236,53 @@ CLI 不读取 MCP 配置中的 `env`，需单独设置 `AGENTX_DIR` 才能与 MC
 
 无弱样本且无未评分样本时 `insights` 为空数组。
 
-### 典型流程（本地评测闭环）
+### 本地评分 DSL（`apply_evaluation_dsl`）
+
+`dsl` 为有序规则集 + 可选 `default`，**首条命中规则生效**；命中结果按评测集模式写入 `score`（1-5 整数）或 `gsb`：
+
+```json
+{
+  "default": { "score": 3 },
+  "rules": [
+    { "when": "len(answer) < 40", "score": 1, "feedback": "回答过短" },
+    { "when": "(answer contains 'SQLite' or answer contains 'WAL') and len(answer) >= 40", "score": 5 }
+  ]
+}
+```
+
+- 条件语法：`field op value` 子句用 `and` / `or` 连接，可用 `()` 分组（`and` 优先级高于 `or`）；多词取值需加引号，引号内的空格及 `and` / `or` 字样不会被误切。例：`"(answer contains 'SQLite' or answer contains 'WAL') and len(answer) >= 40"`。
+- 可用字段：`answer`、`question`、`rendered_question`、`ideal_answer`、`reference_answer`、`feedback`、`score`、`gsb`、`rated`、`variables.<key>`、`len(<field>)`。
+- 操作符：`=` `!=` `>` `>=` `<` `<=` `contains` `!contains`；数值比较遇非数值返回 `false`。
+- 默认只处理**未评分**样本（`overwrite: true` 可重评）；`limit` 为 1-1000（默认 100）；`dryRun: true` 只返回决策、不写库。
+- 规则 / `default` 的评分字段必须与 `mode` 一致，否则在取样前报错；无规则命中且无 `default` 时该样本跳过。
+
+### 可选 AI 能力
+
+三个 `ai_*` 工具共用 `AiProvider`（`src/ai/provider.ts`），由 `AGENTX_AI_API_KEY` 及可选 `AGENTX_AI_BASE_URL` / `AGENTX_AI_MODEL` 构造 OpenAI 兼容客户端（内置 `fetch`，无新依赖）。**未配置时抛 `AiProviderNotConfiguredError`**，绝不静默使用 stub。
+
+| 工具 | 行为 | 失败处理 |
+|---|---|---|
+| `ai_rate_evaluation_samples` | 对未评分样本逐条请求评分，校验后写入 `rateEvaluationSample`；默认最多 20 条 | 单条响应非 JSON / 分数越界 / 缺字段时记入 `errors[]` 并跳过，不影响其他样本 |
+| `ai_rewrite_prompt` | 汇总弱样本、`insights`、当前 Prompt 与评分概况，产出 `rewrittenPrompt` + `rationale` | 响应缺 `rewrittenPrompt` 时抛错；**不写回资产**，`applied` 恒为 `false` |
+| `ai_generate_evaluation_samples` | 以种子样本的 `question` 为模板，请模型批量生成 `{{变量}}` 取值；本地渲染后以版本快照的 Prompt 作为 system、渲染提问作为 user 跑出回答，单事务写入新样本 | 模板无变量 / `count` 越界 / 无种子且未给 `question` 时抛错；占位符未解析、变量重复、单条回答失败时记入 `errors[]` 并跳过，不影响其余样本；`dryRun` 只返回候选 |
+
+`ai_generate_evaluation_samples` 的 `count` 为 1-20（默认 5），`generateAnswers: false` 时只生成变量、回答留空；新样本一律**未评分**，需再走评分流程。`apply_prompt_rewrite` 是闭环收尾的本地写操作：传入 `rewrittenPrompt` 时完全离线，省略时先调用 `ai_rewrite_prompt`（需要 provider）；它依次更新资产内容、创建版本快照、创建绑定到新版本的评测集，`dryRun` 三者都不执行，返回中 `applied` 明确标记是否落盘。
+
+`suggest_prompt_improvements` 与 `apply_evaluation_dsl` 始终为纯本地规则，不生成新的 Prompt 文本。
+
+### 典型流程（本地闭环 + 可选 AI 回流）
 
 1. `create_version_snapshot({ assetId })` → 得到 `version`
 2. `create_evaluation_set({ assetId, version, name, mode: 'score' })` → 得到 `setId`
-3. `add_evaluation_samples({ setId, question: '总结 {{topic}}', samples: [{ answer, variables: { topic: 'SQLite' } }, ...] })` → 由种子样本批量构建评测数据集
-4. `rate_evaluation_sample({ sampleId, score })` → 逐条评分
+3. `add_evaluation_samples({ setId, question: '总结 {{topic}}', samples: [{ answer, variables: { topic: 'SQLite' } }, ...] })` → 由种子提问批量构建评测数据集；可选 `ai_generate_evaluation_samples({ setId, count: 5 })` 从种子自动扩充变量与回答
+4. 评分三选一或组合：`rate_evaluation_sample` 逐条 / `apply_evaluation_dsl` 本地规则批量 / `ai_rate_evaluation_samples` 可选 AI 批量
 5. `list_evaluation_samples({ setId, maxScore: 2 })` → 聚焦低分样本明细
-6. `suggest_prompt_improvements({ setId })` → 得到弱样本清单与可操作的改写建议（未渲染变量、缺参照答案、反馈、变量集中等），据此修订 Prompt
-7. `create_version_snapshot({ assetId })` + 新评测集，重复 3-4
+6. `suggest_prompt_improvements({ setId })` + 可选 `ai_rewrite_prompt({ setId })` → 规则诊断与候选改写文本（不自动写回）
+7. `apply_prompt_rewrite({ setId, rewrittenPrompt })`（或省略候选让 AI 生成）→ 一步完成资产改写、新版本快照、新评测集；返回 `evaluationSetId`，重复 3-4 完成新版本评测
 8. `compare_evaluation_sets({ baselineSetId, candidateSetId })` → 判定新版本平均分 / GSB 净胜率是否提升，决定是否采纳
 
-> 全程本地 SQLite、本地渲染与规则诊断，不调用外部模型；AI 批量生成变量、AI 智能评分、AI 一键改写等能力不在本实现范围内，`suggest_prompt_improvements` 不会生成新的 Prompt 文本。
-> 错误边界：`version` 不存在、模式不匹配、评分越界、资产/模式不一致、未知 `setId` / `sampleId` 均抛出明确错误，由 MCP 层返回 `isError`。
+> 默认路径全程本地 SQLite、本地渲染与规则诊断，不调用外部模型；只有显式调用三个 `ai_*` 工具且配置了 `AGENTX_AI_API_KEY` 时才会产生模型请求。AI 不会自动改写资产、不会自动创建新版本——这两件事只在显式调用 `apply_prompt_rewrite` 时发生。
+> 错误边界：`version` 不存在、模式不匹配、评分越界、DSL 语法或字段非法、AI provider 未配置、资产/模式不一致、未知 `setId` / `sampleId` 均抛出明确错误，由 MCP 层返回 `isError`。
 
 ---
 
@@ -262,6 +317,9 @@ SQLite（`better-sqlite3`，WAL 模式），`src/store/db.ts` 在 `initDb()` 中
 | `AGENTX_API_HOST` | `localhost` | REST API 监听地址 |
 | `AGENTX_API_KEY` | 未设置 | 启用 REST API 认证 |
 | `AGENTX_MONITOR_INTERVAL` | `5000` | 监控刷新间隔（ms） |
+| `AGENTX_AI_API_KEY` | 未设置 | 为 `TeamEngine` 与 `ai_*` 评测工具注入 OpenAI 兼容 provider；未设置时保持纯本地 |
+| `AGENTX_AI_BASE_URL` | `https://api.openai.com/v1` | 任意 OpenAI 兼容端点 |
+| `AGENTX_AI_MODEL` | `gpt-4o-mini` | 默认模型；单个工具可用 `model` 参数覆盖 |
 
 源码中其余变量：`AGENTX_HOME`、`AGENTX_LOG_LEVEL`、`AGENTX_MCP_ENV_ALLOW`、`AGENTX_MCP_MAX_MEMORY`、`AGENTX_MCP_TIMEOUT`、`AGENTX_OTEL_ENABLED`、`AGENTX_OTEL_ENDPOINT`、`AGENTX_OTEL_SAMPLE_RATE`、`AGENTX_OTEL_SERVICE_NAME`、`AGENTX_OTEL_SERVICE_VERSION`、`AGENTX_VAULT_DIR`、`AGENTX_VAULT_DISABLE_KEYCHAIN`、`AGENTX_VAULT_PASSPHRASE`。用途与默认值以对应模块源码为准。
 
@@ -275,4 +333,4 @@ SQLite（`better-sqlite3`，WAL 模式），`src/store/db.ts` 在 `initDb()` 中
 node scripts/verify-docs.mjs
 ```
 
-该脚本共 10 项校验：版本 / Node 徽章、工具数量与逐项覆盖、分组计数之和、CLI 命令数与文档表格、API 参考工具清单，以及文档内所有本地 Markdown 链接。
+该脚本共 12 项校验：版本 / Node 徽章、工具数量与逐项覆盖、分组计数之和、CLI 命令数与文档表格、API 参考工具清单、AI 环境变量覆盖、工作流实现与文档一致，以及文档内所有本地 Markdown 链接。

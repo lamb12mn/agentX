@@ -59,6 +59,16 @@ const groupCounts = [...toolSection.matchAll(/^\*\*(?!增强模式追加)([^*]+)
   .map((m) => Number(m[2]));
 const groupSum = groupCounts.reduce((sum, n) => sum + n, 0);
 
+// AI provider 接线与工作流执行：源码与文档不得再次漂移
+const aiEnvVars = ['AGENTX_AI_API_KEY', 'AGENTX_AI_BASE_URL', 'AGENTX_AI_MODEL'];
+const missingAiEnvVars = aiEnvVars.filter(
+  (name) => !readme.includes(`\`${name}\``) || !apiRef.includes(`\`${name}\``),
+);
+const restSource = read('agentx-mcp/src/api/rest-api.ts');
+const staleWorkflowStub = restSource.includes('not_implemented')
+  || /固定返回 `status: 'not_implemented'`/u.test(apiRef)
+  || /目前返回 `status: not_implemented`/u.test(readme);
+
 const checks = [
   [`README version badge matches ${pkg.version}`, readme.includes(`version-${pkg.version}-green.svg`)],
   [`README Node badge matches engines.node (${pkg.engines.node})`, readme.includes(`node-%3E%3D${nodeMajor}-brightgreen.svg`)],
@@ -69,6 +79,8 @@ const checks = [
   [`README CLI count matches documented commands (${documentedCommands.length})`, declaredCli === documentedCommands.length],
   [`every documented CLI command exists in source`, unknownCommands.length === 0, unknownCommands.join(', ')],
   [`CONTRIBUTING Node version matches engines.node`, contributing.includes(`>= ${nodeMajor}.0.0`)],
+  [`AI provider env vars documented in README and API_REFERENCE`, missingAiEnvVars.length === 0, missingAiEnvVars.join(', ')],
+  [`workflow execute is implemented and docs reflect it`, !staleWorkflowStub],
   [`all local markdown links resolve`, brokenLinks.length === 0, brokenLinks.join(', ')],
 ];
 

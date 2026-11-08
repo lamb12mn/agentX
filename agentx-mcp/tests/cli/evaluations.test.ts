@@ -66,7 +66,7 @@ describe('CLI evaluation commands', () => {
     return { assetId: asset.id, version };
   }
 
-  it('registers the evaluation group with nine tool commands plus snapshot', () => {
+  it('registers the evaluation group with fourteen tool commands plus snapshot', () => {
     const program = new Command();
     registerEvaluationCommand(program);
 
@@ -74,7 +74,66 @@ describe('CLI evaluation commands', () => {
     expect(program.commands[0].commands.map(c => c.name())).toEqual([
       'snapshot', 'create', 'list', 'add-sample', 'add-samples', 'rate',
       'samples', 'summary', 'compare', 'suggest',
+      'apply-dsl', 'ai-rate', 'ai-rewrite', 'ai-generate', 'apply-rewrite',
     ]);
+  });
+
+  it('applies a rewrite candidate offline through the CLI', async () => {
+    const { assetId, version } = await makeAsset('cli-rewrite-prompt');
+    const set = await invoke(['evaluation', 'create', assetId, String(version), 'baseline']);
+    const file = join(tmpDir, 'candidate.json');
+    writeFileSync(file, JSON.stringify({
+      rewrittenPrompt: 'Rewrite {{topic}} in three paragraphs',
+    }));
+
+    const preview = await invoke([
+      'evaluation', 'apply-rewrite', set.id, file, '--dry-run',
+    ]);
+    expect(preview).toMatchObject({ applied: false, version: null, evaluationSetId: null });
+
+    const applied = await invoke([
+      'evaluation', 'apply-rewrite', set.id, file, '--name', 'candidate',
+    ]);
+    expect(applied).toMatchObject({ applied: true, version: version + 1 });
+
+    const summary = await invoke(['evaluation', 'summary', applied.evaluationSetId]);
+    expect(summary).toMatchObject({ version: version + 1, mode: 'score', total: 0 });
+  });
+
+  it('applies a local DSL file and honours --dry-run', async () => {
+    const { assetId, version } = await makeAsset('cli-dsl-prompt');
+    const set = await invoke(['evaluation', 'create', assetId, String(version), 'dsl']);
+    await invoke(['evaluation', 'add-sample', set.id, 'Q', 'short']);
+    await invoke(['evaluation', 'add-sample', set.id, 'Q', 'a detailed answer about SQLite']);
+
+    const file = join(tmpDir, 'dsl.json');
+    writeFileSync(file, JSON.stringify({
+      default: { score: 3 },
+      rules: [
+        { when: 'len(answer) < 20', score: 1, feedback: 'too short' },
+        { when: "answer contains 'SQLite'", score: 5 },
+      ],
+    }));
+
+    const dry = await invoke(['evaluation', 'apply-dsl', set.id, file, '--dry-run']);
+    expect(dry).toMatchObject({ evaluated: 2, matched: 2, written: 0, dryRun: true });
+
+    const applied = await invoke(['evaluation', 'apply-dsl', set.id, file]);
+    expect(applied.written).toBe(2);
+    expect(await invoke(['evaluation', 'summary', set.id])).toMatchObject({ averageScore: 3 });
+  });
+
+  it('AI subcommands report a missing provider instead of fabricating output', async () => {
+    const { assetId, version } = await makeAsset('cli-ai-prompt');
+    const set = await invoke(['evaluation', 'create', assetId, String(version), 'ai']);
+    const key = process.env.AGENTX_AI_API_KEY;
+    delete process.env.AGENTX_AI_API_KEY;
+
+    expect(await invoke(['evaluation', 'ai-rate', set.id])).toBeNull();
+    expect(process.exitCode).toBe(1);
+    expect(await invoke(['evaluation', 'ai-rewrite', set.id])).toBeNull();
+
+    if (key !== undefined) process.env.AGENTX_AI_API_KEY = key;
   });
 
   it('runs the local score-mode loop end to end', async () => {

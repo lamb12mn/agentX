@@ -7,14 +7,16 @@
  *     "default": { "score": 3 },
  *     "rules": [
  *       { "when": "len(answer) < 40", "score": 1, "feedback": "回答过短" },
- *       { "when": "answer contains 'SQLite' and len(answer) >= 40", "score": 5 }
+ *       { "when": "(answer contains 'SQLite' or answer contains 'WAL') and len(answer) >= 40", "score": 5 }
  *     ]
  *   }
  *
- * Conditions are `field op value` clauses joined by `and`; the first matching
- * rule wins. Fields: answer, question, rendered_question, ideal_answer,
+ * Conditions are `field op value` clauses combined with `and` / `or` and
+ * parentheses (`and` binds tighter); the first matching rule wins.
+ * Fields: answer, question, rendered_question, ideal_answer,
  * reference_answer, feedback, score, gsb, rated, variables.<key>, len(<field>).
- * Operators: = != > >= < <= contains !contains. Quote multi-word values.
+ * Operators: = != > >= < <= contains !contains. Quote multi-word values;
+ * quoted values may safely contain spaces and the words `and` / `or`.
  *
  * Purely local — no model calls and no new dependencies.
  */
@@ -33,6 +35,12 @@ export interface DslClause {
   op: DslOperator;
   value: string | number | boolean;
 }
+
+/** Boolean condition tree. `parseExpression` exposes the flat `and`-chain view. */
+export type DslCondition =
+  | { kind: 'clause'; clause: DslClause }
+  | { kind: 'and'; children: DslCondition[] }
+  | { kind: 'or'; children: DslCondition[] };
 
 export interface DslOutcome {
   score?: number;
@@ -79,19 +87,157 @@ const KNOWN_FIELDS = new Set([
   'reference_answer', 'feedback', 'score', 'gsb', 'rated',
 ]);
 const CLAUSE_RE = /^(.+?)\s*(!contains|contains|>=|<=|!=|=|>|<)\s*(.+)$/;
+const LEN_RE = /^len\([^()]*\)/i;
 
-/** Parse one `when` expression into clauses; throws on unknown fields or bad syntax. */
-export function parseExpression(expression: string): DslClause[] {
+type Token =
+  | { kind: 'word'; text: string }
+  | { kind: 'logic'; text: 'and' | 'or' }
+  | { kind: 'paren'; text: '(' | ')' };
+
+/** Split a condition into words, logic keywords and grouping parentheses. */
+function tokenize(expression: string): Token[] {
+  const tokens: Token[] = [];
+  let buffer = '';
+  let quote: string | null = null;
+
+  const flush = (): void => {
+    const text = buffer.trim();
+    buffer = '';
+    if (!text) return;
+    const lower = text.toLowerCase();
+    if (lower === 'and' || lower === 'or') tokens.push({ kind: 'logic', text: lower });
+    else tokens.push({ kind: 'word', text });
+  };
+
+  for (let i = 0; i < expression.length; i += 1) {
+    const ch = expression[i];
+    if (quote) {
+      buffer += ch;
+      if (ch === quote) quote = null;
+      continue;
+    }
+    if (ch === "'" || ch === '"') {
+      quote = ch;
+      buffer += ch;
+      continue;
+    }
+    // `len(<field>)` is an atomic field expression, not a grouping paren.
+    const lenMatch = expression.slice(i).match(LEN_RE);
+    if (lenMatch) {
+      buffer += lenMatch[0];
+      i += lenMatch[0].length - 1;
+      continue;
+    }
+    if (ch === '(' || ch === ')') {
+      flush();
+      tokens.push({ kind: 'paren', text: ch });
+      continue;
+    }
+    if (/\s/.test(ch)) flush();
+    else buffer += ch;
+  }
+  if (quote) throw new Error('Unterminated quote in DSL condition');
+  flush();
+  return tokens;
+}
+
+function parseClause(text: string): DslClause {
+  const match = text.trim().match(CLAUSE_RE);
+  if (!match) throw new Error(`Invalid DSL clause: "${text.trim()}"`);
+  const field = match[1].trim().replace(/\s+/g, '');
+  validateField(field);
+  return { field, op: match[2] as DslOperator, value: parseValue(match[3]) };
+}
+
+/**
+ * Parse a full boolean condition. `and` binds tighter than `or`; parentheses
+ * override precedence. Quoted values stay intact as a single word.
+ */
+export function parseCondition(expression: string): DslCondition {
   if (typeof expression !== 'string' || !expression.trim()) {
     throw new Error('DSL condition must be a non-empty string');
   }
-  return expression.split(/\s+and\s+/i).map((part) => {
-    const match = part.trim().match(CLAUSE_RE);
-    if (!match) throw new Error(`Invalid DSL clause: "${part.trim()}"`);
-    const field = match[1].trim().replace(/\s+/g, '');
-    validateField(field);
-    return { field, op: match[2] as DslOperator, value: parseValue(match[3]) };
-  });
+  const tokens = tokenize(expression);
+  let cursor = 0;
+
+  function peek(): Token | undefined {
+    return tokens[cursor];
+  }
+
+  function consumeClause(): DslCondition {
+    const words: string[] = [];
+    while (cursor < tokens.length) {
+      const token = tokens[cursor];
+      if (token.kind !== 'word') break;
+      words.push(token.text);
+      cursor += 1;
+    }
+    return { kind: 'clause', clause: parseClause(words.join(' ')) };
+  }
+
+  function parseAtom(): DslCondition {
+    const token = peek();
+    if (!token) throw new Error('Incomplete DSL condition');
+    if (token.kind === 'logic') throw new Error(`Unexpected "${token.text}" in DSL condition`);
+    if (token.kind === 'word') return consumeClause();
+    if (token.text === ')') throw new Error('Unmatched ")" in DSL condition');
+    cursor += 1;
+    const inner = parseOr();
+    const closing = peek();
+    if (!closing || closing.kind !== 'paren' || closing.text !== ')') {
+      throw new Error('Unmatched "(" in DSL condition');
+    }
+    cursor += 1;
+    return inner;
+  }
+
+  function parseAnd(): DslCondition {
+    const children = [parseAtom()];
+    for (;;) {
+      const token = peek();
+      if (!token || token.kind !== 'logic' || token.text !== 'and') break;
+      cursor += 1;
+      children.push(parseAtom());
+    }
+    return children.length === 1 ? children[0] : { kind: 'and', children };
+  }
+
+  function parseOr(): DslCondition {
+    const children = [parseAnd()];
+    for (;;) {
+      const token = peek();
+      if (!token || token.kind !== 'logic' || token.text !== 'or') break;
+      cursor += 1;
+      children.push(parseAnd());
+    }
+    return children.length === 1 ? children[0] : { kind: 'or', children };
+  }
+
+  const result = parseOr();
+  if (cursor < tokens.length) {
+    throw new Error(`Unexpected token "${tokens[cursor].text}" in DSL condition`);
+  }
+  return result;
+}
+
+/** Parse a flat `and`-chain into clauses; rejects `or` and parentheses. */
+export function parseExpression(expression: string): DslClause[] {
+  const collect = (node: DslCondition): DslClause[] | null => {
+    if (node.kind === 'clause') return [node.clause];
+    if (node.kind !== 'and') return null;
+    const clauses: DslClause[] = [];
+    for (const child of node.children) {
+      const nested = collect(child);
+      if (!nested) return null;
+      clauses.push(...nested);
+    }
+    return clauses;
+  };
+  const clauses = collect(parseCondition(expression));
+  if (!clauses) {
+    throw new Error('parseExpression only supports `and` chains; use parseCondition for `or` / parentheses');
+  }
+  return clauses;
 }
 
 function validateField(field: string): void {
@@ -161,8 +307,16 @@ function matchesClause(clause: DslClause, sample: EvaluationSample): boolean {
   }
 }
 
-export function matchesExpression(clauses: DslClause[], sample: EvaluationSample): boolean {
-  return clauses.every(clause => matchesClause(clause, sample));
+export function matchesExpression(
+  condition: DslClause[] | DslCondition,
+  sample: EvaluationSample,
+): boolean {
+  if (Array.isArray(condition)) return condition.every(clause => matchesClause(clause, sample));
+  if (condition.kind === 'clause') return matchesClause(condition.clause, sample);
+  if (condition.kind === 'and') {
+    return condition.children.every(child => matchesExpression(child, sample));
+  }
+  return condition.children.some(child => matchesExpression(child, sample));
 }
 
 function validateOutcome(outcome: DslOutcome, mode: EvaluationMode, label: string): void {
@@ -196,7 +350,7 @@ export function applyEvaluationDsl(
       throw new Error(`Rule ${index}: "when" must be a string`);
     }
     validateOutcome(rule, mode, `Rule ${index}`);
-    return { clauses: parseExpression(rule.when), outcome: rule };
+    return { condition: parseCondition(rule.when), outcome: rule };
   });
   const fallback = dsl.default;
   if (fallback) validateOutcome(fallback, mode, 'default');
@@ -213,7 +367,7 @@ export function applyEvaluationDsl(
 
   const decisions: DslDecision[] = [];
   for (const sample of samples) {
-    const index = compiled.findIndex(rule => matchesExpression(rule.clauses, sample));
+    const index = compiled.findIndex(rule => matchesExpression(rule.condition, sample));
     const outcome = index >= 0 ? compiled[index].outcome : fallback;
     if (!outcome) continue;
     decisions.push({

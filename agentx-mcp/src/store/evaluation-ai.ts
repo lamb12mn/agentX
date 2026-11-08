@@ -10,14 +10,18 @@
  * to the asset — applying it stays an explicit caller decision.
  */
 import { requireAiProvider } from '../ai/provider.js';
-import type { AiProvider } from '../ai/provider.js';
+import type { AiMessage, AiProvider } from '../ai/provider.js';
 import {
+  addEvaluationSamples,
+  createEvaluationSet,
   getEvaluationSummary,
   listEvaluationSamples,
   rateEvaluationSample,
   suggestEvaluationImprovements,
 } from './evaluations.js';
-import { readAssetContent } from './assets.js';
+import { readAssetContent, updateAsset } from './assets.js';
+import { createVersionSnapshot, getVersion } from './versions.js';
+import { renderTemplate } from '../orchestrator/template.js';
 import type { EvaluationSample } from './evaluations.js';
 import type { EvaluationMode, GsbVerdict } from '../types.js';
 
@@ -243,4 +247,256 @@ export async function aiRewritePrompt(
     insightCodes: report.insights.map(insight => insight.code),
     applied: false,
   };
+}
+
+// ── Dataset expansion: "AI 批量生成变量" ─────────────────────────────────────
+
+export interface AiGenerateSamplesOptions {
+  provider?: AiProvider;
+  /** Number of new variable sets to request (1-20, default 5). */
+  count?: number;
+  /** Question template with {{variables}}; defaults to the first seed sample. */
+  question?: string;
+  /** Ask the model to answer each rendered question (default true). */
+  generateAnswers?: boolean;
+  /** Return candidates without writing samples. */
+  dryRun?: boolean;
+  model?: string;
+  timeout?: number;
+  instructions?: string;
+}
+
+export interface GeneratedEvaluationSample {
+  variables: Record<string, unknown>;
+  renderedQuestion: string;
+  answer: string;
+}
+
+export interface AiGenerateSamplesResult {
+  setId: string;
+  mode: EvaluationMode;
+  question: string;
+  variableKeys: string[];
+  requested: number;
+  generated: number;
+  created: number;
+  dryRun: boolean;
+  samples: GeneratedEvaluationSample[];
+  errors: string[];
+}
+
+function extractVariableKeys(template: string): string[] {
+  return [...new Set(
+    [...template.matchAll(/\{\{([^}]+)\}\}/g)]
+      .map(match => match[1].trim())
+      .filter(Boolean),
+  )];
+}
+
+function parseVariableSets(parsed: Record<string, unknown>): Array<Record<string, unknown>> {
+  const list = parsed.samples;
+  if (!Array.isArray(list)) {
+    throw new Error('AI response must contain a "samples" array');
+  }
+  return list
+    .filter((entry): entry is Record<string, unknown> =>
+      typeof entry === 'object' && entry !== null && !Array.isArray(entry))
+    .map(entry => {
+      const variables = entry.variables;
+      return typeof variables === 'object' && variables !== null && !Array.isArray(variables)
+        ? variables as Record<string, unknown>
+        : {};
+    });
+}
+
+/**
+ * Expand an evaluation dataset from seed samples by generating diverse variable
+ * sets with a real provider. Answers come from running the bound version's
+ * prompt; everything is rendered locally and written in one transaction.
+ * Never falls back to fabricated data when no provider is configured.
+ */
+export async function aiGenerateEvaluationSamples(
+  setId: string,
+  options: AiGenerateSamplesOptions = {},
+): Promise<AiGenerateSamplesResult> {
+  const provider = requireAiProvider(options.provider);
+  const summary = getEvaluationSummary(setId);
+  const count = options.count ?? 5;
+  if (!Number.isInteger(count) || count < 1 || count > 20) {
+    throw new Error('count must be an integer between 1 and 20');
+  }
+
+  const seeds = listEvaluationSamples(setId, { limit: 20 });
+  const question = options.question ?? seeds[0]?.question;
+  if (!question || !question.trim()) {
+    throw new Error('No seed sample found: provide a "question" template with {{variables}}');
+  }
+  const variableKeys = extractVariableKeys(question);
+  if (variableKeys.length === 0) {
+    throw new Error('question template must contain at least one {{variable}} placeholder');
+  }
+
+  const response = await provider.execute([
+    {
+      role: 'system',
+      content: 'You build diverse evaluation datasets for prompt tuning. Reply with ONLY a JSON object: {"samples":[{"variables":{...}}]}. Every variables object must resolve every listed key; for dotted keys return nested objects. Do not invent other keys and do not include answers.',
+    },
+    {
+      role: 'user',
+      content: JSON.stringify({
+        count,
+        variableKeys,
+        questionTemplate: question,
+        seedVariables: seeds.slice(0, 8).map(sample => sample.variables),
+        ...(options.instructions ? { instructions: options.instructions } : {}),
+      }, null, 2),
+    },
+  ], { temperature: 0.9, model: options.model, timeout: options.timeout ?? defaultTimeout });
+
+  const candidates = parseVariableSets(parseJsonObject(response.content)).slice(0, count);
+  const snapshot = getVersion(summary.assetId, summary.version);
+  const systemPrompt = snapshot?.snapshot_data.content ?? '';
+
+  const samples: GeneratedEvaluationSample[] = [];
+  const errors: string[] = [];
+  const seen = new Set<string>();
+
+  for (const variables of candidates) {
+    const renderedQuestion = renderTemplate(question, variables);
+    if (/\{\{[^}]+\}\}/.test(renderedQuestion)) {
+      errors.push(`unresolved placeholders for ${JSON.stringify(variables)}`);
+      continue;
+    }
+    const signature = JSON.stringify(variables, Object.keys(variables).sort());
+    if (seen.has(signature)) {
+      errors.push(`duplicate variables skipped: ${signature}`);
+      continue;
+    }
+    seen.add(signature);
+
+    let answer = '';
+    if (options.generateAnswers !== false) {
+      try {
+        const messages: AiMessage[] = [];
+        if (systemPrompt.trim()) {
+          messages.push({ role: 'system', content: renderTemplate(systemPrompt, variables) });
+        }
+        messages.push({ role: 'user', content: renderedQuestion });
+        const generated = await provider.execute(messages, {
+          temperature: 0.7,
+          model: options.model,
+          timeout: options.timeout ?? defaultTimeout,
+        });
+        answer = generated.content.trim();
+        if (!answer) throw new Error('empty answer');
+      } catch (error) {
+        errors.push(`answer generation failed for ${signature}: ${(error as Error).message}`);
+        continue;
+      }
+    }
+    samples.push({ variables, renderedQuestion, answer });
+  }
+
+  let created = 0;
+  if (!options.dryRun && samples.length > 0) {
+    created = addEvaluationSamples({
+      setId,
+      question,
+      samples: samples.map(sample => ({ answer: sample.answer, variables: sample.variables })),
+    }).length;
+  }
+
+  return {
+    setId,
+    mode: summary.mode,
+    question,
+    variableKeys,
+    requested: count,
+    generated: candidates.length,
+    created,
+    dryRun: options.dryRun === true,
+    samples,
+    errors,
+  };
+}
+
+// ── Closing the loop: turn a rewrite candidate into a new prompt version ─────
+
+export interface ApplyRewriteOptions {
+  /** Candidate text; when omitted, aiRewritePrompt() produces one (needs a provider). */
+  rewrittenPrompt?: string;
+  provider?: AiProvider;
+  maxScore?: number;
+  limit?: number;
+  model?: string;
+  timeout?: number;
+  extraInstructions?: string;
+  /** Name for the evaluation set bound to the new version. */
+  name?: string;
+  description?: string;
+  dryRun?: boolean;
+}
+
+export interface ApplyRewriteResult {
+  baselineSetId: string;
+  assetId: string;
+  previousVersion: number;
+  rewrittenPrompt: string;
+  rationale: string | null;
+  version: number | null;
+  evaluationSetId: string | null;
+  applied: boolean;
+}
+
+/**
+ * Apply a rewrite candidate: update the asset, create a version snapshot and
+ * bind a fresh evaluation set to it. Passing rewrittenPrompt explicitly keeps
+ * this path fully offline; dryRun never touches the asset or the database.
+ */
+export async function applyPromptRewrite(
+  setId: string,
+  options: ApplyRewriteOptions = {},
+): Promise<ApplyRewriteResult> {
+  const summary = getEvaluationSummary(setId);
+  let rewrittenPrompt = options.rewrittenPrompt;
+  let rationale: string | null = null;
+
+  if (rewrittenPrompt === undefined) {
+    const candidate = await aiRewritePrompt(setId, {
+      ...(options.provider ? { provider: options.provider } : {}),
+      ...(options.maxScore !== undefined ? { maxScore: options.maxScore } : {}),
+      ...(options.limit !== undefined ? { limit: options.limit } : {}),
+      ...(options.model !== undefined ? { model: options.model } : {}),
+      ...(options.timeout !== undefined ? { timeout: options.timeout } : {}),
+      ...(options.extraInstructions !== undefined ? { extraInstructions: options.extraInstructions } : {}),
+    });
+    rewrittenPrompt = candidate.rewrittenPrompt;
+    rationale = candidate.rationale;
+  }
+  if (!rewrittenPrompt.trim()) {
+    throw new Error('rewrittenPrompt must not be empty');
+  }
+
+  const base = {
+    baselineSetId: setId,
+    assetId: summary.assetId,
+    previousVersion: summary.version,
+    rewrittenPrompt,
+    rationale,
+  };
+  if (options.dryRun) {
+    return { ...base, version: null, evaluationSetId: null, applied: false };
+  }
+
+  await updateAsset(summary.assetId, { content: rewrittenPrompt });
+  const version = await createVersionSnapshot(summary.assetId, 'prompt-rewrite');
+  const evaluationSet = createEvaluationSet({
+    assetId: summary.assetId,
+    version,
+    name: options.name ?? `rewrite-v${version}`,
+    mode: summary.mode,
+    description: options.description ?? `Rewrite of evaluation set ${setId}`,
+  });
+
+  return { ...base, version, evaluationSetId: evaluationSet.id, applied: true };
 }

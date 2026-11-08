@@ -177,7 +177,7 @@ AgentX 可以作为 MCP 服务器运行，供 Claude Code 调用。
 
 #### 可用工具列表
 
-当前基础模式注册 **69 个工具**（15 个注册模块）；设置 `AGENTX_ENHANCED=true` 后额外注册 **38 个增强工具**，合计 107 个。工具名与 `inputSchema` 以运行时 `tools/list` 为准，逐项说明见 [docs/API_REFERENCE.md](docs/API_REFERENCE.md)。
+当前基础模式注册 **74 个工具**（15 个注册模块）；设置 `AGENTX_ENHANCED=true` 后额外注册 **38 个增强工具**，合计 112 个。工具名与 `inputSchema` 以运行时 `tools/list` 为准，逐项说明见 [docs/API_REFERENCE.md](docs/API_REFERENCE.md)。
 
 **资产 CRUD**（30 个）：`skills | prompts | rules | mcps | workflows | agents` 六类各提供 `list_*`、`get_*`、`create_*`、`update_*`、`delete_*`。
 
@@ -187,7 +187,7 @@ AgentX 可以作为 MCP 服务器运行，供 Claude Code 调用。
 
 **版本与导出**（8 个）：`create_version_snapshot`、`list_versions`、`get_version`、`rollback_to_version`、`clear_versions`、`version_stats`、`export_agent`、`export_all`。
 
-**依赖与评测**（14 个）：`check_dependencies`、`get_dependents`、`get_dependencies`、`get_dependency_graph`、`detect_circular_dependency`、`create_evaluation_set`、`list_evaluation_sets`、`add_evaluation_sample`、`add_evaluation_samples`、`list_evaluation_samples`、`rate_evaluation_sample`、`evaluation_summary`、`compare_evaluation_sets`、`suggest_prompt_improvements`。评测为本地评分（`score` 1-5 分 / `gsb` 比较），不调用外部模型；`{{变量}}` 在录入样本时本地渲染，可由一个种子提问加变量集批量构建评测数据集，按低分 / 未评分 / GSB 判定筛选样本明细，对比同一资产两个版本的评测结果判断优化是否有效，并由 `suggest_prompt_improvements` 基于弱样本产出**纯规则**的改写建议（未评分、未渲染变量、缺参照答案、低分反馈、变量取值集中）。
+**依赖与评测**（19 个）：`check_dependencies`、`get_dependents`、`get_dependencies`、`get_dependency_graph`、`detect_circular_dependency`、`create_evaluation_set`、`list_evaluation_sets`、`add_evaluation_sample`、`add_evaluation_samples`、`list_evaluation_samples`、`rate_evaluation_sample`、`evaluation_summary`、`compare_evaluation_sets`、`suggest_prompt_improvements`、`apply_evaluation_dsl`、`ai_rate_evaluation_samples`、`ai_rewrite_prompt`、`ai_generate_evaluation_samples`、`apply_prompt_rewrite`。评测默认全程本地（`score` 1-5 分 / `gsb` 比较），不调用外部模型；`{{变量}}` 本地渲染，可由种子提问批量构建评测数据集、筛选低分样本、对比两个版本、并由 `suggest_prompt_improvements` 产出**纯规则**建议、`apply_evaluation_dsl` 按本地规则 DSL（`and` / `or` / 括号）自动批量打分。`ai_rate_evaluation_samples` / `ai_rewrite_prompt` / `ai_generate_evaluation_samples` 仅在设置 `AGENTX_AI_API_KEY` 后调用外部模型（后者从种子样本批量生成变量并跑出回答），未配置时明确报错（不伪造结果）；AI 改写只返回候选文本，必须显式调用 `apply_prompt_rewrite` 才会写回资产、创建版本快照并绑定新评测集（传入候选文本时可完全离线，`dryRun` 只预览）。
 
 **团队编排**（11 个）：`team.create`、`team.run`、`team.status`、`team.results`、`team.cancel`、`team.list`、`team.history`、`team.logs`、`team.approve`、`team.reject`、`team.pending`。
 
@@ -207,7 +207,7 @@ AgentX 提供命令行工具 `agentx`，当前共有 **26 个顶层命令**（�
 | 导入导出 | `import`、`export`、`export-all`、`backup`、`restore` |
 | 编排与团队 | `team`（create/run/status/results/cancel/list/history/logs/approve/reject/pending）、`graph` |
 | 批量与 MCP | `batch`、`mcp`（send/inspect）、`proxy`、`init` |
-| 评测 | `evaluation`（snapshot/create/list/add-sample/add-samples/rate/samples/summary/compare/suggest） |
+| 评测 | `evaluation`（snapshot/create/list/add-sample/add-samples/rate/samples/summary/compare/suggest/apply-dsl/ai-rate/ai-rewrite/ai-generate/apply-rewrite） |
 | 运维 | `doctor`、`audit`、`vault`、`remote`（add/list/remove/pull/push）、`web` |
 
 下列为常用命令的参数说明：
@@ -347,7 +347,7 @@ agentx import rule --tags "security,imported"
 
 #### 8. `agentx evaluation`
 
-本地 Prompt 评测闭环：9 个子命令与评测 MCP 工具一一对应，另有 `snapshot` 作为纯 CLI 前置辅助命令（评测集必须绑定已存在的版本快照）；所有子命令输出 JSON，便于脚本串联。
+本地 Prompt 评测闭环：14 个子命令与评测 MCP 工具一一对应，另有 `snapshot` 作为纯 CLI 前置辅助命令（评测集必须绑定已存在的版本快照）；所有子命令输出 JSON，便于脚本串联。
 
 ```bash
 # 1. 创建版本快照，返回版本号（也可先用 MCP 的 create_version_snapshot）
@@ -368,10 +368,27 @@ agentx evaluation samples <setId> --max-score 2
 agentx evaluation summary <setId>
 agentx evaluation compare <baselineSetId> <candidateSetId>
 agentx evaluation suggest <setId> --max-score 2
+
+# 6. 本地规则 DSL 自动批量打分（dsl.json 格式见 API 参考第 5 节）
+agentx evaluation apply-dsl <setId> dsl.json --dry-run
+agentx evaluation apply-dsl <setId> dsl.json
+
+# 7. 可选 AI 能力（需先设置 AGENTX_AI_API_KEY）
+agentx evaluation ai-rate <setId> --limit 20
+agentx evaluation ai-rewrite <setId> --instructions '保持中文输出'
+
+# 8. 从种子样本批量生成变量并跑出回答（--dry-run 只预览、不写库）
+agentx evaluation ai-generate <setId> --count 5 --dry-run
+agentx evaluation ai-generate <setId> --count 5
+
+# 9. 把改写候选落成新版本 + 新评测集（传入候选可完全离线）
+agentx evaluation ai-rewrite <setId> > candidate.json
+agentx evaluation apply-rewrite <setId> candidate.json --dry-run
+agentx evaluation apply-rewrite <setId> candidate.json
 ```
 
-子命令：`snapshot` / `create` / `list` / `add-sample` / `add-samples` / `rate` / `samples` / `summary` / `compare` / `suggest`。
-`rate` 在 GSB 模式用 `--gsb good|same|bad`；`samples` 支持 `--rated` / `--unrated` / `--gsb` / `--max-score` / `--limit`；`suggest` 为纯规则诊断，不调用外部模型。
+子命令：`snapshot` / `create` / `list` / `add-sample` / `add-samples` / `rate` / `samples` / `summary` / `compare` / `suggest` / `apply-dsl` / `ai-rate` / `ai-rewrite` / `ai-generate` / `apply-rewrite`。
+`rate` 在 GSB 模式用 `--gsb good|same|bad`；`samples` 支持 `--rated` / `--unrated` / `--gsb` / `--max-score` / `--limit`；`suggest` 与 `apply-dsl` 为纯本地规则，不调用外部模型；`ai-rate` / `ai-rewrite` / `ai-generate` 未配置 `AGENTX_AI_API_KEY` 时明确报错并置 `exitCode = 1`；`apply-rewrite` 用 `--rewritten-prompt` 或候选 JSON 文件可完全离线，`--dry-run` 不写资产也不建版本。
 
 > CLI 与 MCP 需设置同一个 `AGENTX_DIR` 才能访问同一份评测数据。
 
@@ -497,7 +514,7 @@ npm test
 
 相关环境变量：`AGENTX_API_PORT`（默认 3000）、`AGENTX_API_HOST`（默认 localhost）、`AGENTX_API_KEY`（启用 REST 认证）、`AGENTX_MONITOR_INTERVAL`（默认 5000ms）。
 
-> 注意：`/api/workflows/execute` 目前返回 `status: not_implemented`，尚未接入真实执行引擎。
+> 提示：`/api/workflows/execute` 已接入 `TeamEngine`，会读取 workflow 资产的 YAML 并同步执行；未配置 AI provider 时返回结果带 `simulated: true`，明确标记走了本地兜底。
 
 ### 代码规范
 
@@ -661,6 +678,9 @@ npm update -g agentx-mcp
 | `AGENTX_API_HOST` | `localhost` | REST API 监听地址（增强模式） |
 | `AGENTX_API_KEY` | 未设置 | 设置后启用 REST API 认证；未设置时认证关闭并输出警告 |
 | `AGENTX_MONITOR_INTERVAL` | `5000` | 监控面板刷新间隔（ms，增强模式） |
+| `AGENTX_AI_API_KEY` | 未设置 | 设置后为 `TeamEngine` 与 AI 评测工具注入 OpenAI 兼容 provider；未设置时保持纯本地 |
+| `AGENTX_AI_BASE_URL` | `https://api.openai.com/v1` | 任意 OpenAI 兼容端点（如本地 Ollama） |
+| `AGENTX_AI_MODEL` | `gpt-4o-mini` | 默认模型名，工具可用 `model` 参数覆盖 |
 
 源码中另有 `AGENTX_HOME`、`AGENTX_VAULT_*`、`AGENTX_OTEL_*`、`AGENTX_MCP_*`、`AGENTX_LOG_LEVEL` 等变量，完整清单以 `agentx-mcp/src/` 为准。
 

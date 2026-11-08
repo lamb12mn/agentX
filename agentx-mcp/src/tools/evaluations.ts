@@ -22,12 +22,16 @@ import type {
   DslApplicationResult,
 } from '../store/evaluation-dsl.js';
 import {
+  aiGenerateEvaluationSamples,
   aiRateEvaluationSamples,
   aiRewritePrompt,
+  applyPromptRewrite,
 } from '../store/evaluation-ai.js';
 import type {
+  AiGenerateSamplesResult,
   AiRateResult,
   AiRewriteResult,
+  ApplyRewriteResult,
 } from '../store/evaluation-ai.js';
 import type { ToolHandler } from './common.js';
 import type { EvaluationMode, GsbVerdict } from '../types.js';
@@ -115,6 +119,28 @@ export function registerEvaluationTools(): {
     timeout?: number;
     extraInstructions?: string;
   }, AiRewriteResult>;
+  ai_generate_evaluation_samples: ToolHandler<{
+    setId: string;
+    count?: number;
+    question?: string;
+    generateAnswers?: boolean;
+    dryRun?: boolean;
+    model?: string;
+    timeout?: number;
+    instructions?: string;
+  }, AiGenerateSamplesResult>;
+  apply_prompt_rewrite: ToolHandler<{
+    setId: string;
+    rewrittenPrompt?: string;
+    maxScore?: number;
+    limit?: number;
+    model?: string;
+    timeout?: number;
+    extraInstructions?: string;
+    name?: string;
+    description?: string;
+    dryRun?: boolean;
+  }, ApplyRewriteResult>;
 } {
   return {
     create_evaluation_set: {
@@ -284,7 +310,7 @@ export function registerEvaluationTools(): {
           setId: { type: 'string', description: 'Evaluation set ID' },
           dsl: {
             type: 'object',
-            description: 'Ordered rules with `when` conditions plus score/gsb/feedback outcomes, and an optional default',
+            description: 'Ordered rules with `when` conditions (and/or/parentheses) plus score/gsb/feedback outcomes, and an optional default',
             properties: {
               default: { type: 'object', description: 'Outcome when no rule matches' },
               rules: {
@@ -293,7 +319,7 @@ export function registerEvaluationTools(): {
                 items: {
                   type: 'object',
                   properties: {
-                    when: { type: 'string', description: 'Clauses joined by `and`, e.g. "len(answer) >= 40 and answer contains \'SQLite\'"' },
+                    when: { type: 'string', description: 'Clauses joined by `and` / `or` with parentheses (`and` binds tighter), e.g. "(answer contains \'SQLite\' or answer contains \'WAL\') and len(answer) >= 40"' },
                     score: { type: 'number', description: '1-5 (score mode)' },
                     gsb: { type: 'string', enum: ['good', 'same', 'bad'], description: 'GSB mode' },
                     feedback: { type: 'string', description: 'Optional feedback attached to the rating' },
@@ -344,6 +370,46 @@ export function registerEvaluationTools(): {
         required: ['setId'],
       },
       handler: async ({ setId, ...options }) => aiRewritePrompt(setId, options),
+    },
+
+    ai_generate_evaluation_samples: {
+      description: 'Expand an evaluation dataset from seed samples by generating diverse {{variables}} with an AI provider (requires AGENTX_AI_API_KEY)',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          setId: { type: 'string', description: 'Evaluation set ID' },
+          count: { type: 'number', description: 'Number of new variable sets (1-20, default 5)' },
+          question: { type: 'string', description: 'Template with {{variables}}; defaults to the first seed sample' },
+          generateAnswers: { type: 'boolean', description: 'Let the model answer each rendered question (default true)' },
+          dryRun: { type: 'boolean', description: 'Return candidates without writing samples' },
+          model: { type: 'string', description: 'Override the configured model' },
+          timeout: { type: 'number', description: 'Per-request timeout in ms (default 30000)' },
+          instructions: { type: 'string', description: 'Extra guidance for variable diversity' },
+        },
+        required: ['setId'],
+      },
+      handler: async ({ setId, ...options }) => aiGenerateEvaluationSamples(setId, options),
+    },
+
+    apply_prompt_rewrite: {
+      description: 'Apply a rewrite candidate: update the asset, create a version snapshot and bind a new evaluation set (offline when rewrittenPrompt is supplied)',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          setId: { type: 'string', description: 'Baseline evaluation set ID' },
+          rewrittenPrompt: { type: 'string', description: 'Candidate prompt; omit to generate one with an AI provider' },
+          maxScore: { type: 'number', description: 'Score mode only: low-score threshold' },
+          limit: { type: 'number', description: 'Maximum weak samples for context' },
+          model: { type: 'string', description: 'Override the configured model' },
+          timeout: { type: 'number', description: 'Request timeout in ms' },
+          extraInstructions: { type: 'string', description: 'Additional rewrite constraints' },
+          name: { type: 'string', description: 'Name for the new evaluation set' },
+          description: { type: 'string', description: 'Description for the new evaluation set' },
+          dryRun: { type: 'boolean', description: 'Preview without writing anything' },
+        },
+        required: ['setId'],
+      },
+      handler: async ({ setId, ...options }) => applyPromptRewrite(setId, options),
     },
   };
 }

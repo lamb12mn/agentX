@@ -1,10 +1,13 @@
 /**
  * CLI evaluation command group — the local prompt evaluation loop.
  *
- * Mirrors the nine MCP tools in src/tools/evaluations.ts one-to-one:
- *   create / list / add-sample / add-samples / rate / samples /
- *   summary / compare / suggest
+ * Mirrors the fourteen MCP tools in src/tools/evaluations.ts one-to-one:
+ *   create / list / add-sample / add-samples / rate / samples / summary /
+ *   compare / suggest / apply-dsl / ai-rate / ai-rewrite / ai-generate /
+ *   apply-rewrite
  * Plus `snapshot`, the CLI-only prerequisite for creating a version snapshot.
+ * `ai-rate` / `ai-rewrite` / `ai-generate` need AGENTX_AI_API_KEY;
+ * `apply-rewrite` is offline when a candidate is supplied.
  *
  * All commands print JSON and never call process.exit(), so they stay
  * testable and composable in scripts.
@@ -29,6 +32,14 @@ import type {
   BatchAddEvaluationSamplesInput,
   ListEvaluationSamplesOptions,
 } from '../../store/evaluations.js';
+import { applyEvaluationDsl } from '../../store/evaluation-dsl.js';
+import type { EvaluationDsl } from '../../store/evaluation-dsl.js';
+import {
+  aiGenerateEvaluationSamples,
+  aiRateEvaluationSamples,
+  aiRewritePrompt,
+  applyPromptRewrite,
+} from '../../store/evaluation-ai.js';
 import { createVersionSnapshot } from '../../store/versions.js';
 import type { EvaluationMode, GsbVerdict } from '../../types.js';
 
@@ -183,4 +194,124 @@ export function registerEvaluationCommand(program: Command): void {
         maxScore: optionalInt(opts.maxScore, '--max-score'),
         limit: optionalInt(opts.limit, '--limit'),
       })));
+
+  evaluation
+    .command('apply-dsl <setId> <file>')
+    .description('Auto-rate samples with a local rule DSL from a JSON file')
+    .option('--dry-run', 'Show decisions without writing ratings')
+    .option('--limit <n>', 'Maximum samples to inspect')
+    .option('--overwrite', 'Also re-rate already rated samples')
+    .action((
+      setId: string, file: string,
+      opts: { dryRun?: boolean; limit?: string; overwrite?: boolean },
+    ) => run(async () => {
+      const dsl = parseJson<EvaluationDsl>(await readFile(file, 'utf-8'), file);
+      return applyEvaluationDsl(setId, dsl, {
+        dryRun: opts.dryRun,
+        limit: optionalInt(opts.limit, '--limit'),
+        overwrite: opts.overwrite,
+      });
+    }));
+
+  evaluation
+    .command('ai-rate <setId>')
+    .description('Rate samples with an AI provider (requires AGENTX_AI_API_KEY)')
+    .option('--limit <n>', 'Maximum samples to rate')
+    .option('--overwrite', 'Also re-rate already rated samples')
+    .option('--model <name>', 'Override the configured model')
+    .option('--timeout <ms>', 'Per-sample timeout in ms')
+    .action((
+      setId: string,
+      opts: { limit?: string; overwrite?: boolean; model?: string; timeout?: string },
+    ) => run(() => aiRateEvaluationSamples(setId, {
+      limit: optionalInt(opts.limit, '--limit'),
+      overwrite: opts.overwrite,
+      model: opts.model,
+      timeout: optionalInt(opts.timeout, '--timeout'),
+    })));
+
+  evaluation
+    .command('ai-rewrite <setId>')
+    .description('Propose a rewritten prompt from weak samples (requires AGENTX_AI_API_KEY)')
+    .option('--max-score <n>', 'Score mode: low-score threshold')
+    .option('--limit <n>', 'Maximum weak samples for context')
+    .option('--model <name>', 'Override the configured model')
+    .option('--timeout <ms>', 'Request timeout in ms')
+    .option('--instructions <text>', 'Additional rewrite constraints')
+    .action((
+      setId: string,
+      opts: { maxScore?: string; limit?: string; model?: string; timeout?: string; instructions?: string },
+    ) => run(() => aiRewritePrompt(setId, {
+      maxScore: optionalInt(opts.maxScore, '--max-score'),
+      limit: optionalInt(opts.limit, '--limit'),
+      model: opts.model,
+      timeout: optionalInt(opts.timeout, '--timeout'),
+      extraInstructions: opts.instructions,
+    })));
+
+  evaluation
+    .command('ai-generate <setId>')
+    .description('Expand the dataset with AI-generated {{variables}} (requires AGENTX_AI_API_KEY)')
+    .option('--count <n>', 'Number of new variable sets (1-20)')
+    .option('--question <template>', 'Question template with {{variables}}')
+    .option('--no-answers', 'Generate variables only, leave answers empty')
+    .option('--dry-run', 'Return candidates without writing samples')
+    .option('--model <name>', 'Override the configured model')
+    .option('--timeout <ms>', 'Per-request timeout in ms')
+    .option('--instructions <text>', 'Extra guidance for variable diversity')
+    .action((
+      setId: string,
+      opts: {
+        count?: string; question?: string; answers?: boolean; dryRun?: boolean;
+        model?: string; timeout?: string; instructions?: string;
+      },
+    ) => run(() => aiGenerateEvaluationSamples(setId, {
+      count: optionalInt(opts.count, '--count'),
+      question: opts.question,
+      generateAnswers: opts.answers,
+      dryRun: opts.dryRun,
+      model: opts.model,
+      timeout: optionalInt(opts.timeout, '--timeout'),
+      instructions: opts.instructions,
+    })));
+
+  evaluation
+    .command('apply-rewrite <setId> [file]')
+    .description('Apply a rewrite candidate as a new prompt version + evaluation set')
+    .option('--rewritten-prompt <text>', 'Candidate prompt text (offline; overrides [file])')
+    .option('--dry-run', 'Preview without writing anything')
+    .option('--name <name>', 'Name for the new evaluation set')
+    .option('--description <text>', 'Description for the new evaluation set')
+    .option('--max-score <n>', 'Score mode: low-score threshold')
+    .option('--limit <n>', 'Maximum weak samples for context')
+    .option('--model <name>', 'Override the configured model')
+    .option('--timeout <ms>', 'Request timeout in ms')
+    .option('--instructions <text>', 'Additional rewrite constraints')
+    .action((
+      setId: string, file: string | undefined,
+      opts: {
+        rewrittenPrompt?: string; dryRun?: boolean; name?: string; description?: string;
+        maxScore?: string; limit?: string; model?: string; timeout?: string; instructions?: string;
+      },
+    ) => run(async () => {
+      let rewrittenPrompt = opts.rewrittenPrompt;
+      if (rewrittenPrompt === undefined && file) {
+        const candidate = parseJson<{ rewrittenPrompt?: string }>(await readFile(file, 'utf-8'), file);
+        rewrittenPrompt = candidate.rewrittenPrompt;
+      }
+      if (rewrittenPrompt !== undefined && !rewrittenPrompt.trim()) {
+        throw new Error('rewrittenPrompt must not be empty');
+      }
+      return applyPromptRewrite(setId, {
+        ...(rewrittenPrompt !== undefined ? { rewrittenPrompt } : {}),
+        dryRun: opts.dryRun,
+        name: opts.name,
+        description: opts.description,
+        maxScore: optionalInt(opts.maxScore, '--max-score'),
+        limit: optionalInt(opts.limit, '--limit'),
+        model: opts.model,
+        timeout: optionalInt(opts.timeout, '--timeout'),
+        extraInstructions: opts.instructions,
+      });
+    }));
 }
