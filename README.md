@@ -173,11 +173,11 @@ AgentX 可以作为 MCP 服务器运行，供 Claude Code 调用。
 
 **配置说明**：
 - `command`: 可以是 `agentx-mcp`（全局安装）或 `node /path/to/dist/index.js`（本地路径）
-- 启动后，Claude Code 默认只看到 25 个高频工具与 2 个元工具（`match_tools` / `discover_tools`）；不确定用哪个工具时把用户原话交给 `match_tools`，隐藏工具仍可按原名直接调用（完整清单见 [docs/API_REFERENCE.md](docs/API_REFERENCE.md)）
+- 启动后，Claude Code 默认只看到 31 个高频工具与 2 个元工具（`match_tools` / `discover_tools`）；不确定用哪个工具时把用户原话交给 `match_tools`，隐藏工具仍可按原名直接调用（完整清单见 [docs/API_REFERENCE.md](docs/API_REFERENCE.md)）
 
 #### 可用工具列表
 
-当前基础模式注册 **79 个工具**（18 个注册模块）；设置 `AGENTX_ENHANCED=true` 后额外注册 **38 个增强工具**，合计 117 个。**默认只在 `tools/list` 暴露 27 个**（25 个核心工具 + `match_tools` + `discover_tools`），其余工具仍可按原名直接调用；设置 `AGENTX_TOOLS=full` 可恢复全量暴露。工具名与 `inputSchema` 以运行时 `tools/list` 为准，逐项说明见 [docs/API_REFERENCE.md](docs/API_REFERENCE.md)。
+当前基础模式注册 **79 个工具**（18 个注册模块）；设置 `AGENTX_ENHANCED=true` 后额外注册 **38 个增强工具**，合计 117 个。**默认只在 `tools/list` 暴露 33 个**（31 个核心工具 + `match_tools` + `discover_tools`），其余工具仍可按原名直接调用；设置 `AGENTX_TOOLS=full` 可恢复全量暴露。工具名与 `inputSchema` 以运行时 `tools/list` 为准，逐项说明见 [docs/API_REFERENCE.md](docs/API_REFERENCE.md)。
 
 **资产 CRUD**（30 个）：`skills | prompts | rules | mcps | workflows | agents` 六类各提供 `list_*`、`get_*`、`create_*`、`update_*`、`delete_*`。
 
@@ -201,7 +201,7 @@ AgentX 可以作为 MCP 服务器运行，供 Claude Code 调用。
 
 **工具分层暴露（默认生效）**
 
-`tools/list` 默认只返回 25 个高频工具 + 两个元工具（`match_tools`、`discover_tools`），共 27 个。其余工具**仍注册、仍可按原名调用**，只是不出现在列表中，因此既有脚本与集成不会失效。
+`tools/list` 默认只返回 31 个高频工具 + 两个元工具（`match_tools`、`discover_tools`），共 33 个。其余工具**仍注册、仍可按原名调用**，只是不出现在列表中，因此既有脚本与集成不会失效。
 
 **不确定用哪个工具时，直接用 `match_tools`**——把用户原话（中文或英文）传进去即可，无需猜工具名：
 
@@ -222,7 +222,7 @@ AgentX 可以作为 MCP 服务器运行，供 Claude Code 调用。
 
 | 取值 | 效果 |
 |---|---|
-| `core`（默认） | 25 个核心工具 + 2 个元工具 |
+| `core`（默认） | 31 个核心工具 + 2 个元工具 |
 | `full` | 全部 79 个基础工具（增强模式下 117 个） |
 | `core,apply_evaluation_dsl,team.create` | 核心集追加指定工具（元工具始终包含） |
 | `list_skills,search_assets` | 只暴露列出的工具（自动包含两个元工具） |
@@ -688,6 +688,7 @@ npm update -g agentx-mcp
 ## 📚 更多资源
 
 - **详细文档**：查看 [docs/](docs/) 目录
+- **提示词优化统一 MCP 流程规范**：[docs/prompt-optimization-workflow.md](docs/prompt-optimization-workflow.md)（所有操作走 MCP、禁脚本、未配模型时由对话智能体兜底）
 - **API 参考**：[docs/API_REFERENCE.md](docs/API_REFERENCE.md)
 - **架构与演进设计**：[docs/superpowers/specs/2026-04-28-agentx-v2-design.md](docs/superpowers/specs/2026-04-28-agentx-v2-design.md)
 - **Team Engine 设计**：[docs/superpowers/specs/2026-06-13-team-engine-improvements-design.md](docs/superpowers/specs/2026-06-13-team-engine-improvements-design.md)

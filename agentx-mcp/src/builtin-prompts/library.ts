@@ -202,7 +202,9 @@ export function matchBuiltinPrompts(query: string, options: MatchOptions = {}): 
   const scored: BuiltinMatch[] = [];
   for (const item of library) {
     if (options.type && item.type !== options.type) continue;
-    if (options.category && !item.category.includes(options.category)) continue;
+    const category = options.category;
+    if (category && !item.category.includes(category)
+      && !item.categoryPath.some((part) => part.includes(category))) continue;
 
     let score = 0;
     const reasons: string[] = [];
@@ -243,10 +245,13 @@ export interface AutoBuiltinMatch {
   readonly reference: string;
 }
 
+/** A weak match must not silently become the content of a new asset. */
+export const AUTO_MATCH_MIN_SCORE = 25;
+
 /** Resolve the best built-in prompt for an intent; used by create/update tool chains. */
 export function autoMatchBuiltin(query: string): AutoBuiltinMatch | null {
   const top = matchBuiltinPrompts(query, { limit: 1 })[0];
-  if (!top) return null;
+  if (!top || top.score < AUTO_MATCH_MIN_SCORE) return null;
   const item = getBuiltinPrompt(top.id);
   if (!item) return null;
   return {

@@ -1,0 +1,45 @@
+name: prompt-optimization
+version: "1.0.0"
+description: >
+  提示词优化与评测打分的标准编排流程。每个步骤的机械动作走 agentx MCP
+  工具，智能决策（生成能力清单、判断评分）由对话智能体承担；无 AI provider
+  时 TeamEngine 以 simulated 模式跑流程骨架，对话智能体按本拓扑逐步调用 MCP
+  落盘，全程禁止硬编码脚本。
+agents:
+  - role: analyst
+    agent_ref: analyst
+    required: true
+  - role: prompt_engineer
+    agent_ref: prompt_engineer
+    required: true
+  - role: evaluator
+    agent_ref: evaluator
+    required: true
+variables:
+  - name: assetId
+    type: string
+    description: 目标提示词资产 ID
+  - name: baselineVersion
+    type: number
+    description: 优化前基线版本号（由 analyst 在首步确认）
+  - name: capabilitySpec
+    type: string
+    description: 对话智能体产出的新能力清单 / templateVars（JSON 字符串）
+workflow:
+  # 1) analyst → prompt_engineer
+  #    analyst: 澄清需求；mcp get_prompt / list_versions 读现状；
+  #             mcp create_version_snapshot 留基线（baselineVersion）。
+  #    prompt_engineer: 生成 capabilitySpec；mcp update_prompt(templateId+templateVars) 落盘为新版本。
+  - from: analyst
+    to: prompt_engineer
+  # 2) prompt_engineer → evaluator
+  #    mcp create_evaluation_set ×2（绑定 baseline / 新版本）；
+  #    mcp add_evaluation_samples 加入同一批能力探针样本。
+  - from: prompt_engineer
+    to: evaluator
+  # 3) evaluator → analyst
+  #    evaluator: 读两版本内容判断评分；mcp rate_evaluation_sample / apply_evaluation_dsl 落分；
+  #               mcp evaluation_summary → compare_evaluation_sets 产出提升证据；
+  #    analyst: 收尾汇报是否保留新版本（否则 mcp rollback_to_version 回退）。
+  - from: evaluator
+    to: analyst

@@ -36,7 +36,7 @@
 
 ## 2. 工具总览
 
-当前基础模式注册 **80 次、79 个唯一工具名**（18 个注册模块）；增强模式追加 **38 个**，合计 **117 个**。`tools/list` 默认只暴露 27 个（25 个核心工具 + `match_tools` + `discover_tools`），详见 2.3 / 2.4 节。
+当前基础模式注册 **80 次、79 个唯一工具名**（18 个注册模块）；增强模式追加 **38 个**，合计 **117 个**。`tools/list` 默认只暴露 33 个（31 个核心工具 + `match_tools` + `discover_tools`），详见 2.3 / 2.4 节。
 
 `export_agent` 同时定义在 `tools/agents.ts` 与 `tools/export.ts`；`src/index.ts` 按对象展开顺序合并且后者在后，因此**运行时生效的是 `tools/export.ts` 的实现**。
 
@@ -86,7 +86,7 @@
 
 ### 2.3 工具发现与分层暴露
 
-`tools/list` 默认只返回 25 个高频工具 + 两个始终暴露的元工具 `match_tools` / `discover_tools`（共 27 个）。其余工具**仍注册、仍可按原名调用**，只是不出现在列表中；这既减少模型的选择负担与上下文占用，也不破坏既有脚本。启动诊断输出形如 `Tool exposure: core — 27/79 tools in tools/list`。
+`tools/list` 默认只返回 31 个高频工具 + 两个始终暴露的元工具 `match_tools` / `discover_tools`（共 33 个）。其余工具**仍注册、仍可按原名调用**，只是不出现在列表中；这既减少模型的选择负担与上下文占用，也不破坏既有脚本。启动诊断输出形如 `Tool exposure: core — 33/79 tools in tools/list`。
 
 | 工具 | 参数 | 返回 |
 |---|---|---|
@@ -100,7 +100,7 @@
 
 | 取值 | 行为 |
 |---|---|
-| 未设置 / `core` | 25 个核心工具 + 2 个元工具 |
+| 未设置 / `core` | 31 个核心工具 + 2 个元工具 |
 | `full` | 全部注册工具（增强模式下 117 个） |
 | `core,apply_evaluation_dsl,team.create` | 核心集追加指定工具（元工具始终包含） |
 | `list_skills,search_assets` | 仅暴露列出的工具（自动包含两个元工具） |

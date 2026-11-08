@@ -98,7 +98,7 @@ export function registerRuleTools(baseDir: string): RuleTools {
         let matchedBuiltin: MatchedBuiltin | undefined;
         if (!body && intent) {
           const matched = autoMatchBuiltin(intent);
-          if (!matched) throw new Error(`No built-in prompt matched the intent: ${intent}`);
+          if (!matched) throw new Error(`No reliable built-in prompt match for "${intent}". Provide content explicitly, or use match_builtin_prompts.`);
           body = matched.text;
           matchedBuiltin = { id: matched.id, title: matched.title, score: matched.score };
         }

@@ -82,4 +82,49 @@ describe('built-in function prompt templates', () => {
     const loaded = await tools.get_prompt.handler({ id: meta.id });
     expect(loaded!.content).toBe('custom body');
   });
+
+  it('renders a parameterised built-in template when creating a prompt', async () => {
+    const tools = registerPromptTools(tmpDir);
+    expect(getTemplate('func-role-capability-expander')).toBeDefined();
+
+    const meta = await tools.create_prompt.handler({
+      name: 'composed-role',
+      templateId: 'func-role-capability-expander',
+      templateVars: {
+        role: '测试架构师',
+        profileDescription: '负责设计与走查',
+        expertise: '架构、前端、后端',
+        audience: '研发团队',
+        skills: '1. 架构设计\n   - 分层与边界',
+        rules: '1. 先澄清',
+        workflows: '1. 现状梳理',
+        outputFormat: '- 结论',
+        initialization: '信息不足时先提问。',
+      },
+    });
+    expect(meta.appliedTemplate).toBe('func-role-capability-expander');
+
+    const loaded = await tools.get_prompt.handler({ id: meta.id });
+    expect(loaded!.content).toContain('# Role: 测试架构师');
+    expect(loaded!.content).toContain('## Skills');
+    expect(loaded!.content).toContain('信息不足时先提问。');
+    expect(loaded!.content).not.toContain('{{role}}');
+  });
+
+  it('restructures an existing prompt through templateVars when updating', async () => {
+    const tools = registerPromptTools(tmpDir);
+    const created = await tools.create_prompt.handler({ name: 'draft-role', content: '旧内容' });
+
+    const updated = await tools.update_prompt.handler({
+      id: created.id,
+      templateId: 'func-role-capability-expander',
+      templateVars: { role: '新角色' },
+    });
+    expect(updated.appliedTemplate).toBe('func-role-capability-expander');
+
+    const loaded = await tools.get_prompt.handler({ id: created.id });
+    expect(loaded!.content).toContain('# Role: 新角色');
+    expect(loaded!.content).not.toContain('旧内容');
+    expect(loaded!.content).toContain('{{profileDescription}}');
+  });
 });

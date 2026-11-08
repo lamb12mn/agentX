@@ -5,8 +5,10 @@ import { join } from 'path';
 import { initDb, closeDb } from '../src/store/db.js';
 import { updateAsset, deleteAsset } from '../src/store/assets.js';
 import {
+  AUTO_MATCH_MIN_SCORE,
   BUILTIN_ID_PREFIX,
   assertNotBuiltin,
+  autoMatchBuiltin,
   builtinStats,
   getBuiltinPrompt,
   isBuiltinId,
@@ -98,6 +100,21 @@ describe('immutable built-in prompt library', () => {
       reference: null,
     });
   });
+
+  it('filters by subcategory path, not just the top-level category', async () => {
+    expect(matchBuiltinPrompts('网站 mockup UI 设计', { category: '视觉方案', limit: 3 }).length)
+      .toBeGreaterThan(0);
+
+    const tools = registerBuiltinPromptTools();
+    const listed = await tools.list_builtin_prompts.handler({ category: '视觉方案' });
+    expect(listed.returned).toBeGreaterThan(0);
+  });
+
+  it('rejects weak intent matches instead of copying an unrelated built-in prompt', () => {
+    expect(AUTO_MATCH_MIN_SCORE).toBe(25);
+    expect(autoMatchBuiltin('全能 UI 设计师')).toBeNull();
+    expect(autoMatchBuiltin('把复杂内容讲成白话')?.id).toBe('builtin:plain-language-explainer');
+  });
 });
 
 describe('automatic built-in prompt invocation', () => {
@@ -166,5 +183,12 @@ describe('automatic built-in prompt invocation', () => {
     expect(meta.matchedBuiltin).toBeUndefined();
     const loaded = await tools.get_prompt.handler({ id: meta.id });
     expect(loaded!.content).toBe('my own content');
+  });
+
+  it('refuses to auto-apply a weak match when only intent is given', async () => {
+    const tools = registerPromptTools(tmpDir);
+    await expect(
+      tools.create_prompt.handler({ name: 'weak-intent', intent: '全能 UI 设计师' }),
+    ).rejects.toThrow(/No reliable built-in prompt match/);
   });
 });

@@ -50,9 +50,12 @@ export function registerBuiltinPromptTools(): BuiltinPromptTools {
         description: 'Returns summaries and capture statistics. The full text is available via get_builtin_prompt.',
       },
       handler: async ({ type, category, limit }) => {
-        const all = listBuiltinPrompts().filter(
-          (item) => (!type || item.type === type) && (!category || item.category.includes(category)),
-        );
+        const all = listBuiltinPrompts().filter((item) => {
+          if (type && item.type !== type) return false;
+          if (!category) return true;
+          return item.category.includes(category)
+            || item.categoryPath.some((part) => part.includes(category));
+        });
         const cap = Math.min(Math.max(limit ?? 30, 1), 200);
         return {
           stats: builtinStats(),

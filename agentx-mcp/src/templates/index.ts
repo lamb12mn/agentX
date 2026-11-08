@@ -5,6 +5,7 @@
 
 import type { AssetType } from '../types.js';
 import { functionPromptTemplates } from './function-prompts.js';
+import { roleComposerTemplates } from './role-composer.js';
 
 /**
  * Template definition for creating new assets
@@ -211,6 +212,7 @@ Constraints:
     tags: ['template', 'code'],
   },
   ...functionPromptTemplates,
+  ...roleComposerTemplates,
 ];
 
 /**

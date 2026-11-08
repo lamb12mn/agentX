@@ -23,13 +23,13 @@ export const META_TOOLS: readonly string[] = [DISCOVER_TOOL, MATCH_TOOL];
 
 /** High-frequency tools covering the common asset / version / evaluation flows. */
 export const CORE_TOOLS: readonly string[] = [
-  'list_skills', 'list_prompts', 'list_rules', 'list_mcps', 'list_workflows', 'list_agents',
+  'list_skills', 'list_prompts', 'list_rules', 'list_mcps', 'list_workflows', 'create_workflow', 'get_workflow', 'update_workflow', 'delete_workflow', 'list_agents',
   'get_skill', 'get_prompt', 'get_agent',
-  'create_skill', 'create_prompt',
+  'create_skill', 'create_prompt', 'update_prompt',
   'search_assets',
   'create_version_snapshot', 'list_versions', 'rollback_to_version',
   'get_dependencies',
-  'create_evaluation_set', 'add_evaluation_samples', 'evaluation_summary', 'compare_evaluation_sets',
+  'create_evaluation_set', 'add_evaluation_samples', 'evaluation_summary', 'compare_evaluation_sets', 'apply_evaluation_dsl',
   'team.run', 'team.status',
   'list_builtin_prompts', 'get_builtin_prompt', 'match_builtin_prompts',
 ];

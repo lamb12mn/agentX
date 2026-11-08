@@ -116,7 +116,7 @@ export function registerAgentTools(baseDir: string): AgentTools {
 
         if (intent) {
           const matched = autoMatchBuiltin(intent);
-          if (!matched) throw new Error(`No built-in prompt matched the intent: ${intent}`);
+          if (!matched) throw new Error(`No reliable built-in prompt match for "${intent}". Provide content explicitly, or use match_builtin_prompts.`);
           if (!nextConfig.role_prompt) {
             nextConfig = { ...nextConfig, role_prompt: matched.text };
           }

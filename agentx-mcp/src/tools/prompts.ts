@@ -2,11 +2,28 @@ import { createAsset, getAsset, listAssets, updateAsset, deleteAsset, readAssetC
 import type { AssetMeta } from '../types.js';
 import { getTemplate } from '../templates/index.js';
 import { autoMatchBuiltin } from '../builtin-prompts/library.js';
+import { renderTemplate } from '../orchestrator/template.js';
 
 interface MatchedBuiltin {
   id: string;
   title: string;
   score: number;
+}
+
+type PromptWriteResult = AssetMeta & {
+  matchedBuiltin?: MatchedBuiltin;
+  appliedTemplate?: string;
+};
+
+function renderBuiltinTemplate(
+  templateId: string,
+  variables: Record<string, string> | undefined,
+): string {
+  const tmpl = getTemplate(templateId);
+  if (!tmpl || tmpl.type !== 'prompt') {
+    throw new Error(`Unknown prompt template: ${templateId}`);
+  }
+  return renderTemplate(tmpl.content, variables ?? {});
 }
 
 interface ToolHandler<TInput, TOutput> {
@@ -21,8 +38,8 @@ interface ToolHandler<TInput, TOutput> {
 export interface PromptTools {
   list_prompts: ToolHandler<Record<string, never>, AssetMeta[]>;
   get_prompt: ToolHandler<{ id: string }, { meta: AssetMeta; content: string } | null>;
-  create_prompt: ToolHandler<{ name: string; content?: string; templateId?: string; intent?: string; description?: string; tags?: string[] }, AssetMeta & { matchedBuiltin?: MatchedBuiltin }>;
-  update_prompt: ToolHandler<{ id: string; name?: string; description?: string; tags?: string[]; content?: string; optimizeIntent?: string }, AssetMeta & { matchedBuiltin?: MatchedBuiltin }>;
+  create_prompt: ToolHandler<{ name: string; content?: string; templateId?: string; templateVars?: Record<string, string>; intent?: string; description?: string; tags?: string[] }, PromptWriteResult>;
+  update_prompt: ToolHandler<{ id: string; name?: string; description?: string; tags?: string[]; content?: string; templateId?: string; templateVars?: Record<string, string>; optimizeIntent?: string }, PromptWriteResult>;
   delete_prompt: ToolHandler<{ id: string }, void>;
 }
 
@@ -81,6 +98,11 @@ export function registerPromptTools(baseDir: string): PromptTools {
             type: 'string',
             description: 'Built-in prompt template id to use as the content when content is omitted',
           },
+          templateVars: {
+            type: 'object',
+            additionalProperties: { type: 'string' },
+            description: 'Values for {{placeholders}} in a parameterised built-in template (used with templateId)',
+          },
           intent: {
             type: 'string',
             description: 'Natural-language intent; when content/templateId are omitted, the best matching built-in prompt is applied automatically',
@@ -98,27 +120,29 @@ export function registerPromptTools(baseDir: string): PromptTools {
         required: ['name'],
         description: 'Creates a new prompt asset. Provide content, templateId, or intent for automatic built-in prompt matching.',
       },
-      handler: async ({ name, content, templateId, intent, description, tags }) => {
+      handler: async ({ name, content, templateId, templateVars, intent, description, tags }) => {
         let body = content ?? '';
         let matchedBuiltin: MatchedBuiltin | undefined;
+        let appliedTemplate: string | undefined;
 
         if (!body && templateId) {
-          const tmpl = getTemplate(templateId);
-          if (!tmpl || tmpl.type !== 'prompt') {
-            throw new Error(`Unknown prompt template: ${templateId}`);
-          }
-          body = tmpl.content;
+          body = renderBuiltinTemplate(templateId, templateVars);
+          appliedTemplate = templateId;
         }
         if (!body && intent) {
           const matched = autoMatchBuiltin(intent);
-          if (!matched) throw new Error(`No built-in prompt matched the intent: ${intent}`);
+          if (!matched) throw new Error(`No reliable built-in prompt match for "${intent}". Provide content explicitly, or use templateId / match_builtin_prompts.`);
           body = matched.text;
           matchedBuiltin = { id: matched.id, title: matched.title, score: matched.score };
         }
         if (!body) throw new Error('content, templateId or intent is required');
 
         const meta = await createAsset({ type: 'prompt', name, description, tags: tags ?? [] }, body, baseDir);
-        return { ...meta, ...(matchedBuiltin ? { matchedBuiltin } : {}) };
+        return {
+          ...meta,
+          ...(matchedBuiltin ? { matchedBuiltin } : {}),
+          ...(appliedTemplate ? { appliedTemplate } : {}),
+        };
       },
     },
 
@@ -148,28 +172,45 @@ export function registerPromptTools(baseDir: string): PromptTools {
             type: 'string',
             description: 'New prompt content (optional)',
           },
+          templateId: {
+            type: 'string',
+            description: 'Rebuild the prompt from a parameterised built-in template (use with templateVars)',
+          },
+          templateVars: {
+            type: 'object',
+            additionalProperties: { type: 'string' },
+            description: 'Values for {{placeholders}} in the built-in template',
+          },
           optimizeIntent: {
             type: 'string',
-            description: 'When optimizing, automatically match a built-in prompt and append it as a read-only reference block',
+            description: 'Legacy: automatically match a built-in prompt and append it as a read-only reference block',
           },
         },
         required: ['id'],
-        description: 'Updates an existing prompt. All fields except id are optional; optimizeIntent auto-applies the best matching built-in prompt.',
+        description: 'Updates an existing prompt. Use templateId + templateVars to restructure content, or content to replace it directly.',
       },
-      handler: async ({ id, name, description, tags, content, optimizeIntent }) => {
+      handler: async ({ id, name, description, tags, content, templateId, templateVars, optimizeIntent }) => {
         let body = content;
         let matchedBuiltin: MatchedBuiltin | undefined;
+        let appliedTemplate: string | undefined;
 
-        if (optimizeIntent) {
+        if (body === undefined && templateId) {
+          body = renderBuiltinTemplate(templateId, templateVars);
+          appliedTemplate = templateId;
+        } else if (optimizeIntent) {
           const matched = autoMatchBuiltin(optimizeIntent);
-          if (!matched) throw new Error(`No built-in prompt matched the intent: ${optimizeIntent}`);
+          if (!matched) throw new Error(`No reliable built-in prompt match for "${optimizeIntent}". Provide content explicitly, or use match_builtin_prompts.`);
           const current = body ?? (await readAssetContent(id)) ?? '';
           body = [current.trim(), matched.reference].filter(Boolean).join('\n\n');
           matchedBuiltin = { id: matched.id, title: matched.title, score: matched.score };
         }
 
         const meta = await updateAsset(id, { name, description, tags, content: body });
-        return { ...meta, ...(matchedBuiltin ? { matchedBuiltin } : {}) };
+        return {
+          ...meta,
+          ...(matchedBuiltin ? { matchedBuiltin } : {}),
+          ...(appliedTemplate ? { appliedTemplate } : {}),
+        };
       },
     },
 

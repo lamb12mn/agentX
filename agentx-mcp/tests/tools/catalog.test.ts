@@ -10,7 +10,7 @@ import type { CatalogTool } from '../../src/tools/catalog.js';
 
 const available = [
   ...CORE_TOOLS,
-  'update_skill', 'delete_skill', 'apply_evaluation_dsl', 'ai_rewrite_prompt',
+  'update_skill', 'delete_skill', 'rate_evaluation_sample', 'ai_rewrite_prompt',
   'team.create', 'vault.get', DISCOVER_TOOL,
 ];
 

@@ -59,8 +59,10 @@ describe('MCP tool exposure', () => {
     expect(names).toContain('list_builtin_prompts');
     expect(names).toContain('get_builtin_prompt');
     expect(names).toContain('match_builtin_prompts');
+    expect(names).toContain('update_prompt');
+    expect(names).toContain('apply_evaluation_dsl');
     expect(names).not.toContain('update_skill');
-    expect(names).not.toContain('apply_evaluation_dsl');
+    expect(names).not.toContain('apply_prompt_rewrite');
   }, 60000);
 
   it('exposes every registered tool with AGENTX_TOOLS=full', async () => {
