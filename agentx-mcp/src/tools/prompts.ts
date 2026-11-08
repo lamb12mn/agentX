@@ -1,5 +1,13 @@
 import { createAsset, getAsset, listAssets, updateAsset, deleteAsset, readAssetContent } from '../store/assets.js';
 import type { AssetMeta } from '../types.js';
+import { getTemplate } from '../templates/index.js';
+import { autoMatchBuiltin } from '../builtin-prompts/library.js';
+
+interface MatchedBuiltin {
+  id: string;
+  title: string;
+  score: number;
+}
 
 interface ToolHandler<TInput, TOutput> {
   description: string;
@@ -13,8 +21,8 @@ interface ToolHandler<TInput, TOutput> {
 export interface PromptTools {
   list_prompts: ToolHandler<Record<string, never>, AssetMeta[]>;
   get_prompt: ToolHandler<{ id: string }, { meta: AssetMeta; content: string } | null>;
-  create_prompt: ToolHandler<{ name: string; content: string; description?: string; tags?: string[] }, AssetMeta>;
-  update_prompt: ToolHandler<{ id: string; name?: string; description?: string; tags?: string[]; content?: string }, AssetMeta>;
+  create_prompt: ToolHandler<{ name: string; content?: string; templateId?: string; intent?: string; description?: string; tags?: string[] }, AssetMeta & { matchedBuiltin?: MatchedBuiltin }>;
+  update_prompt: ToolHandler<{ id: string; name?: string; description?: string; tags?: string[]; content?: string; optimizeIntent?: string }, AssetMeta & { matchedBuiltin?: MatchedBuiltin }>;
   delete_prompt: ToolHandler<{ id: string }, void>;
 }
 
@@ -67,7 +75,15 @@ export function registerPromptTools(baseDir: string): PromptTools {
           },
           content: {
             type: 'string',
-            description: 'Prompt content in text format (required)',
+            description: 'Prompt content in text format (required unless templateId is provided)',
+          },
+          templateId: {
+            type: 'string',
+            description: 'Built-in prompt template id to use as the content when content is omitted',
+          },
+          intent: {
+            type: 'string',
+            description: 'Natural-language intent; when content/templateId are omitted, the best matching built-in prompt is applied automatically',
           },
           description: {
             type: 'string',
@@ -79,11 +95,31 @@ export function registerPromptTools(baseDir: string): PromptTools {
             description: 'Optional tags for categorization',
           },
         },
-        required: ['name', 'content'],
-        description: 'Creates a new prompt asset with name and content.',
+        required: ['name'],
+        description: 'Creates a new prompt asset. Provide content, templateId, or intent for automatic built-in prompt matching.',
       },
-      handler: async ({ name, content, description, tags }) =>
-        createAsset({ type: 'prompt', name, description, tags: tags ?? [] }, content, baseDir),
+      handler: async ({ name, content, templateId, intent, description, tags }) => {
+        let body = content ?? '';
+        let matchedBuiltin: MatchedBuiltin | undefined;
+
+        if (!body && templateId) {
+          const tmpl = getTemplate(templateId);
+          if (!tmpl || tmpl.type !== 'prompt') {
+            throw new Error(`Unknown prompt template: ${templateId}`);
+          }
+          body = tmpl.content;
+        }
+        if (!body && intent) {
+          const matched = autoMatchBuiltin(intent);
+          if (!matched) throw new Error(`No built-in prompt matched the intent: ${intent}`);
+          body = matched.text;
+          matchedBuiltin = { id: matched.id, title: matched.title, score: matched.score };
+        }
+        if (!body) throw new Error('content, templateId or intent is required');
+
+        const meta = await createAsset({ type: 'prompt', name, description, tags: tags ?? [] }, body, baseDir);
+        return { ...meta, ...(matchedBuiltin ? { matchedBuiltin } : {}) };
+      },
     },
 
     update_prompt: {
@@ -112,12 +148,29 @@ export function registerPromptTools(baseDir: string): PromptTools {
             type: 'string',
             description: 'New prompt content (optional)',
           },
+          optimizeIntent: {
+            type: 'string',
+            description: 'When optimizing, automatically match a built-in prompt and append it as a read-only reference block',
+          },
         },
         required: ['id'],
-        description: 'Updates an existing prompt. All fields except id are optional - only provided fields will be updated.',
+        description: 'Updates an existing prompt. All fields except id are optional; optimizeIntent auto-applies the best matching built-in prompt.',
       },
-      handler: async ({ id, name, description, tags, content }) =>
-        updateAsset(id, { name, description, tags, content }),
+      handler: async ({ id, name, description, tags, content, optimizeIntent }) => {
+        let body = content;
+        let matchedBuiltin: MatchedBuiltin | undefined;
+
+        if (optimizeIntent) {
+          const matched = autoMatchBuiltin(optimizeIntent);
+          if (!matched) throw new Error(`No built-in prompt matched the intent: ${optimizeIntent}`);
+          const current = body ?? (await readAssetContent(id)) ?? '';
+          body = [current.trim(), matched.reference].filter(Boolean).join('\n\n');
+          matchedBuiltin = { id: matched.id, title: matched.title, score: matched.score };
+        }
+
+        const meta = await updateAsset(id, { name, description, tags, content: body });
+        return { ...meta, ...(matchedBuiltin ? { matchedBuiltin } : {}) };
+      },
     },
 
     delete_prompt: {

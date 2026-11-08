@@ -36,11 +36,11 @@
 
 ## 2. 工具总览
 
-当前基础模式注册 **77 次、76 个唯一工具名**（17 个注册模块）；增强模式追加 **38 个**，合计 **114 个**。`tools/list` 默认只暴露 24 个（22 个核心工具 + `match_tools` + `discover_tools`），详见 2.3 / 2.4 节。
+当前基础模式注册 **80 次、79 个唯一工具名**（18 个注册模块）；增强模式追加 **38 个**，合计 **117 个**。`tools/list` 默认只暴露 27 个（25 个核心工具 + `match_tools` + `discover_tools`），详见 2.3 / 2.4 节。
 
 `export_agent` 同时定义在 `tools/agents.ts` 与 `tools/export.ts`；`src/index.ts` 按对象展开顺序合并且后者在后，因此**运行时生效的是 `tools/export.ts` 的实现**。
 
-### 2.1 基础工具（76 个唯一名）
+### 2.1 基础工具（79 个唯一名）
 
 | 注册模块 | 数量 | 工具名 |
 |---|---|---|
@@ -61,6 +61,7 @@
 | `tools/teams.ts` | 11 | `team.create`, `team.run`, `team.status`, `team.results`, `team.cancel`, `team.list`, `team.history`, `team.logs`, `team.approve`, `team.reject`, `team.pending` |
 | `tools/catalog.ts` | 1 | `discover_tools`（见 2.3 节） |
 | `tools/intent.ts` | 1 | `match_tools`（见 2.4 节） |
+| `tools/builtin-prompts.ts` | 3 | `list_builtin_prompts`, `get_builtin_prompt`, `match_builtin_prompts`（见 2.5 节） |
 
 > 六类资产的 CRUD 遵循 `list_* / get_* / create_* / update_* / delete_*` 命名约定。
 
@@ -85,7 +86,7 @@
 
 ### 2.3 工具发现与分层暴露
 
-`tools/list` 默认只返回 22 个高频工具 + 两个始终暴露的元工具 `match_tools` / `discover_tools`（共 24 个）。其余工具**仍注册、仍可按原名调用**，只是不出现在列表中；这既减少模型的选择负担与上下文占用，也不破坏既有脚本。启动诊断输出形如 `Tool exposure: core — 24/76 tools in tools/list`。
+`tools/list` 默认只返回 25 个高频工具 + 两个始终暴露的元工具 `match_tools` / `discover_tools`（共 27 个）。其余工具**仍注册、仍可按原名调用**，只是不出现在列表中；这既减少模型的选择负担与上下文占用，也不破坏既有脚本。启动诊断输出形如 `Tool exposure: core — 27/79 tools in tools/list`。
 
 | 工具 | 参数 | 返回 |
 |---|---|---|
@@ -99,8 +100,8 @@
 
 | 取值 | 行为 |
 |---|---|
-| 未设置 / `core` | 22 个核心工具 + 2 个元工具 |
-| `full` | 全部注册工具（增强模式下 114 个） |
+| 未设置 / `core` | 25 个核心工具 + 2 个元工具 |
+| `full` | 全部注册工具（增强模式下 117 个） |
 | `core,apply_evaluation_dsl,team.create` | 核心集追加指定工具（元工具始终包含） |
 | `list_skills,search_assets` | 仅暴露列出的工具（自动包含两个元工具） |
 
@@ -131,6 +132,18 @@
 - `execute: true` 仅在 `autoSelect`、必填参数齐全、且工具命中只读白名单（`list_*` / `get_*` / `search_*` / `check_*` / `compare_*` / `detect_*` / `suggest_*` / `version_stats` / `evaluation_summary` / `team.status` 等）时真正调用，结果写入 `executed`；**写操作与元工具一律拒绝**，只返回 `callTemplate` 与 `refused`。执行器异常写入 `executed.error`，不丢弃匹配结果。
 - `useAi: true` 时通过 `AiProvider` 对本地 top-10 候选重排，返回名必须落在候选集内；无 provider 抛 `AiProviderNotConfiguredError`（不静默伪造），provider 报错则降级本地并置 `aiRerank.status = 'failed'`。本地打分始终保留，AI 只改变顺序。
 - `tools/call` 传入未知工具名时，错误 `suggestion` 会附上 `rankTools()` 的 top-3 候选，例如把 `list_promts` 纠正为 `list_prompts`。
+
+### 2.5 内置提示词库
+
+`src/builtin-prompts/garden-prompts.json` 收录 147 条内置提示词（`text` 25 / `image` 122，正文共 135,932 字符，来源 `https://garden.always200.com/`）。数据随 `dist/` 分发，与用户资产库隔离；运行时深冻结，且 `updateAsset` / `deleteAsset` 首行拒绝 `builtin:` 前缀与内置 slug，因此**不可修改、不可删除**。
+
+| 工具 | 参数 | 说明 |
+|---|---|---|
+| `list_builtin_prompts` | type?, category?, limit? | 列举摘要与抓取统计 |
+| `get_builtin_prompt` | id（必填） | 返回完整 `promptText` / `notes` / 参数 / 来源，以及可注入的参考块 |
+| `match_builtin_prompts` | query（必填）, limit?, type?, category? | 本地加权匹配（标题 8 / 标签 5 / 分类 4 / 描述 3 / 正文 1），返回排序结果、`selected`、`reference` |
+
+**自动调用**：`create_prompt` / `create_rule` / `create_agent` 的 `intent` 与 `update_prompt` 的 `optimizeIntent` 会在工具内部自动匹配并应用 top-1 内置提示词，返回 `matchedBuiltin`；显式 `content` 优先。这三个只读工具不参与 `match_tools` 意图路由竞争。
 
 ---
 

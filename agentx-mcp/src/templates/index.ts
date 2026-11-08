@@ -4,6 +4,7 @@
  */
 
 import type { AssetType } from '../types.js';
+import { functionPromptTemplates } from './function-prompts.js';
 
 /**
  * Template definition for creating new assets
@@ -209,6 +210,7 @@ Constraints:
 - Add comments for clarity`,
     tags: ['template', 'code'],
   },
+  ...functionPromptTemplates,
 ];
 
 /**

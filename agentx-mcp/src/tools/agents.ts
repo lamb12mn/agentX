@@ -2,6 +2,13 @@ import yaml from 'js-yaml';
 import { createAsset, getAsset, listAssets, updateAsset, deleteAsset, readAssetContent } from '../store/assets.js';
 import { exportAgent } from '../export/claude.js';
 import type { AssetMeta, AgentConfig } from '../types.js';
+import { autoMatchBuiltin } from '../builtin-prompts/library.js';
+
+interface MatchedBuiltin {
+  id: string;
+  title: string;
+  score: number;
+}
 
 /**
  * Handler interface for MCP tool registration
@@ -23,7 +30,7 @@ interface ToolHandler<TInput, TOutput> {
 export interface AgentTools {
   list_agents: ToolHandler<Record<string, never>, AssetMeta[]>;
   get_agent: ToolHandler<{ id: string }, { meta: AssetMeta; config: AgentConfig } | null>;
-  create_agent: ToolHandler<{ name: string; description?: string; tags?: string[]; config: AgentConfig }, AssetMeta>;
+  create_agent: ToolHandler<{ name: string; description?: string; tags?: string[]; config: AgentConfig; intent?: string }, AssetMeta & { matchedBuiltin?: MatchedBuiltin }>;
   update_agent: ToolHandler<{ id: string; name?: string; description?: string; tags?: string[] }, AssetMeta>;
   delete_agent: ToolHandler<{ id: string }, void>;
   export_agent: ToolHandler<{ id: string; output_dir: string }, { claude_md_path: string; settings_json_path: string }>;
@@ -95,13 +102,30 @@ export function registerAgentTools(baseDir: string): AgentTools {
             type: 'object',
             description: 'Agent configuration object with: name, version, description?, role_prompt?, rules[], skills[], mcps[], workflow?',
           },
+          intent: {
+            type: 'string',
+            description: 'Natural-language intent; automatically matches a built-in prompt and fills role_prompt when not set',
+          },
         },
         required: ['name', 'config'],
-        description: 'Creates a new agent. The config must include: name (string), version (string). Optional: description, role_prompt, rules, skills, mcps, workflow.',
+        description: 'Creates a new agent. The config must include: name (string), version (string). Optional intent auto-applies a built-in prompt.',
       },
-      handler: async ({ name, description, tags, config }) => {
-        const content = yaml.dump(config);
-        return createAsset({ type: 'agent', name, description, tags: tags ?? [] }, content, baseDir);
+      handler: async ({ name, description, tags, config, intent }) => {
+        let nextConfig = config;
+        let matchedBuiltin: MatchedBuiltin | undefined;
+
+        if (intent) {
+          const matched = autoMatchBuiltin(intent);
+          if (!matched) throw new Error(`No built-in prompt matched the intent: ${intent}`);
+          if (!nextConfig.role_prompt) {
+            nextConfig = { ...nextConfig, role_prompt: matched.text };
+          }
+          matchedBuiltin = { id: matched.id, title: matched.title, score: matched.score };
+        }
+
+        const content = yaml.dump(nextConfig);
+        const meta = await createAsset({ type: 'agent', name, description, tags: tags ?? [] }, content, baseDir);
+        return { ...meta, ...(matchedBuiltin ? { matchedBuiltin } : {}) };
       },
     },
 

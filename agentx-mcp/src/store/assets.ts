@@ -11,6 +11,7 @@ import {
 } from './dependencies.js';
 import type { AssetMeta, AssetType } from '../types.js';
 import { diag } from '../observability/diag.js';
+import { assertNotBuiltin } from '../builtin-prompts/library.js';
 
 interface CreateAssetInput {
   type: AssetType;
@@ -122,6 +123,7 @@ export async function listAssets(type?: AssetType): Promise<AssetMeta[]> {
 
 /** 更新资产：修改数据库记录及可选的文件内容 */
 export async function updateAsset(id: string, input: UpdateAssetInput): Promise<AssetMeta> {
+  assertNotBuiltin(id);
   const db = getDb();
   const now = Date.now();
 
@@ -167,6 +169,7 @@ export async function updateAsset(id: string, input: UpdateAssetInput): Promise<
 
 /** 删除资产：移除文件和数据库记录 */
 export async function deleteAsset(id: string): Promise<void> {
+  assertNotBuiltin(id);
   const db = getDb();
 
   // 删除前清理依赖关系

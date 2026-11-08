@@ -4,6 +4,7 @@ import type { AssetType } from '../../types.js';
 import chalk from 'chalk';
 import { input, editor, confirm } from '@inquirer/prompts';
 import { getBaseDir, withDb } from '../common.js';
+import { getTemplate } from '../../templates/index.js';
 
 const VALID_TYPES: AssetType[] = ['skill', 'prompt', 'rule', 'mcp', 'workflow', 'agent'];
 
@@ -13,6 +14,7 @@ interface CreateOptions {
   content?: string;
   description?: string;
   tags?: string;
+  template?: string;
   interactive?: boolean;
 }
 
@@ -28,11 +30,12 @@ export function registerCreateCommand(program: Command): void {
     .option('-c, --content <content>', 'Asset content (or @file to read from file)')
     .option('-d, --description <desc>', 'Asset description')
     .option('--tags <tags>', 'Comma-separated tags')
+    .option('-T, --template <id>', 'Built-in template id to use as the initial content')
     .option('-i, --interactive', 'Interactive mode (prompt for all values)')
     .action(withDb(async (options: CreateOptions) => {
       const baseDir = getBaseDir();
 
-      const { name, content, description, tags, interactive } = options;
+      const { name, content, description, tags, template, interactive } = options;
       let { type } = options;
 
       // Validate type
@@ -46,8 +49,23 @@ export function registerCreateCommand(program: Command): void {
       let finalDesc = description ?? '';
       let finalTags: string[] = [];
 
+      if (template && !content) {
+        const tmpl = getTemplate(template);
+        if (!tmpl) {
+          console.error(chalk.red(`Unknown template: ${template}`));
+          process.exit(1);
+        }
+        if (tmpl.type !== type) {
+          console.error(chalk.red(`Template "${template}" is for ${tmpl.type}, not ${type}`));
+          process.exit(1);
+        }
+        finalContent = tmpl.content;
+        finalDesc = finalDesc || tmpl.description;
+        finalTags = [...tmpl.tags];
+      }
+
       // Interactive mode
-      if (interactive || !name || !content) {
+      if (interactive || !name || !finalContent) {
         const useInteractive = await confirm({ 
           message: 'Use interactive mode?', 
           default: true 

@@ -1,5 +1,12 @@
 import { createAsset, getAsset, listAssets, updateAsset, deleteAsset, readAssetContent } from '../store/assets.js';
 import type { AssetMeta } from '../types.js';
+import { autoMatchBuiltin } from '../builtin-prompts/library.js';
+
+interface MatchedBuiltin {
+  id: string;
+  title: string;
+  score: number;
+}
 
 interface ToolHandler<TInput, TOutput> {
   description: string;
@@ -13,7 +20,7 @@ interface ToolHandler<TInput, TOutput> {
 export interface RuleTools {
   list_rules: ToolHandler<Record<string, never>, AssetMeta[]>;
   get_rule: ToolHandler<{ id: string }, { meta: AssetMeta; content: string } | null>;
-  create_rule: ToolHandler<{ name: string; content: string; description?: string; tags?: string[] }, AssetMeta>;
+  create_rule: ToolHandler<{ name: string; content?: string; intent?: string; description?: string; tags?: string[] }, AssetMeta & { matchedBuiltin?: MatchedBuiltin }>;
   update_rule: ToolHandler<{ id: string; name?: string; description?: string; tags?: string[]; content?: string }, AssetMeta>;
   delete_rule: ToolHandler<{ id: string }, void>;
 }
@@ -67,7 +74,11 @@ export function registerRuleTools(baseDir: string): RuleTools {
           },
           content: {
             type: 'string',
-            description: 'Rule content in markdown format (required)',
+            description: 'Rule content in markdown format (required unless intent is provided)',
+          },
+          intent: {
+            type: 'string',
+            description: 'Natural-language intent; when content is omitted, the best matching built-in prompt is applied automatically',
           },
           description: {
             type: 'string',
@@ -79,11 +90,22 @@ export function registerRuleTools(baseDir: string): RuleTools {
             description: 'Optional tags for categorization',
           },
         },
-        required: ['name', 'content'],
-        description: 'Creates a new rule asset with name and content.',
+        required: ['name'],
+        description: 'Creates a new rule asset. Provide content, or intent for automatic built-in prompt matching.',
       },
-      handler: async ({ name, content, description, tags }) =>
-        createAsset({ type: 'rule', name, description, tags: tags ?? [] }, content, baseDir),
+      handler: async ({ name, content, intent, description, tags }) => {
+        let body = content ?? '';
+        let matchedBuiltin: MatchedBuiltin | undefined;
+        if (!body && intent) {
+          const matched = autoMatchBuiltin(intent);
+          if (!matched) throw new Error(`No built-in prompt matched the intent: ${intent}`);
+          body = matched.text;
+          matchedBuiltin = { id: matched.id, title: matched.title, score: matched.score };
+        }
+        if (!body) throw new Error('content or intent is required');
+        const meta = await createAsset({ type: 'rule', name, description, tags: tags ?? [] }, body, baseDir);
+        return { ...meta, ...(matchedBuiltin ? { matchedBuiltin } : {}) };
+      },
     },
 
     update_rule: {

@@ -56,6 +56,9 @@ describe('MCP tool exposure', () => {
     expect(names).toContain(DISCOVER_TOOL);
     expect(names).toContain(MATCH_TOOL);
     expect(names).toContain('list_skills');
+    expect(names).toContain('list_builtin_prompts');
+    expect(names).toContain('get_builtin_prompt');
+    expect(names).toContain('match_builtin_prompts');
     expect(names).not.toContain('update_skill');
     expect(names).not.toContain('apply_evaluation_dsl');
   }, 60000);

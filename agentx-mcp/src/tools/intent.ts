@@ -100,6 +100,9 @@ const STOPWORDS = new Set([
 /** Only these tools may be auto-executed by `match_tools({ execute: true })`. */
 const READ_ONLY_TOOL = /^(list_|get_|search_|check_|compare_|detect_|suggest_|team\.(status|list|history|logs|pending|results)|version_stats$|evaluation_summary$|list_evaluation_samples$)/;
 
+/** Built-in library tools are called from create/update intent params, not from intent routing. */
+const BUILTIN_LIBRARY_TOOL = /^(list_builtin_prompts|get_builtin_prompt|match_builtin_prompts)$/;
+
 const LEXICON_ENTRIES = Object.entries(LEXICON)
   .flatMap(([concept, aliases]) => aliases.map(alias => ({ concept, alias: alias.toLowerCase() })))
   .sort((a, b) => b.alias.length - a.alias.length);
@@ -291,6 +294,7 @@ export function rankTools(
   const scored: Array<{ match: IntentMatch; hiddenScore: number }> = [];
 
   for (const [name, tool] of Object.entries(context.tools)) {
+    if (BUILTIN_LIBRARY_TOOL.test(name)) continue;
     const group = context.groups[name] ?? (name.includes('.') ? name.split('.')[0] : 'other');
     if (groupFilter && group !== groupFilter) continue;
     const index = indexTool(name, tool, group, context.exposed);

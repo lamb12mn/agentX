@@ -11,6 +11,7 @@ import { registerPromptTools } from './tools/prompts.js';
 import { registerRuleTools } from './tools/rules.js';
 import { registerMcpTools } from './tools/mcps.js';
 import { registerSearchTools } from './tools/search.js';
+import { registerBuiltinPromptTools } from './tools/builtin-prompts.js';
 import { registerWorkflowTools } from './tools/workflows.js';
 import { registerImportTools } from './tools/import.js';
 import { registerBatchTools } from './tools/batch.js';
@@ -112,6 +113,7 @@ const evaluationTools = registerEvaluationTools();
 const exportTools = registerExportTools(baseDir);
 const dependencyTools = registerDependencyTools();
 const teamTools = registerTeamTools(baseDir);
+const builtinPromptTools = registerBuiltinPromptTools();
 
 const allTools: Record<string, AnyHandler> = {
   ...(skillTools as unknown as Record<string, AnyHandler>),
@@ -129,6 +131,7 @@ const allTools: Record<string, AnyHandler> = {
   ...(exportTools as unknown as Record<string, AnyHandler>),
   ...(dependencyTools as unknown as Record<string, AnyHandler>),
   ...(teamTools as unknown as Record<string, AnyHandler>),
+  ...(builtinPromptTools as unknown as Record<string, AnyHandler>),
 };
 
 // ---- Enhanced tools (only when ENHANCED) ----

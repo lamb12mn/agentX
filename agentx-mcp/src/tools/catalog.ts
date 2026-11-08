@@ -31,6 +31,7 @@ export const CORE_TOOLS: readonly string[] = [
   'get_dependencies',
   'create_evaluation_set', 'add_evaluation_samples', 'evaluation_summary', 'compare_evaluation_sets',
   'team.run', 'team.status',
+  'list_builtin_prompts', 'get_builtin_prompt', 'match_builtin_prompts',
 ];
 
 export interface ExposureResult {
