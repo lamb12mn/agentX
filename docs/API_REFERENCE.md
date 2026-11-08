@@ -36,11 +36,11 @@
 
 ## 2. 工具总览
 
-当前基础模式注册 **73 次、72 个唯一工具名**（15 个注册模块）；增强模式追加 **38 个**，合计 **110 个**。
+当前基础模式注册 **77 次、76 个唯一工具名**（17 个注册模块）；增强模式追加 **38 个**，合计 **114 个**。`tools/list` 默认只暴露 24 个（22 个核心工具 + `match_tools` + `discover_tools`），详见 2.3 / 2.4 节。
 
 `export_agent` 同时定义在 `tools/agents.ts` 与 `tools/export.ts`；`src/index.ts` 按对象展开顺序合并且后者在后，因此**运行时生效的是 `tools/export.ts` 的实现**。
 
-### 2.1 基础工具（72 个唯一名）
+### 2.1 基础工具（76 个唯一名）
 
 | 注册模块 | 数量 | 工具名 |
 |---|---|---|
@@ -59,6 +59,8 @@
 | `tools/export.ts` | 2 | `export_agent`, `export_all` |
 | `tools/dependencies.ts` | 5 | `check_dependencies`, `get_dependents`, `get_dependencies`, `get_dependency_graph`, `detect_circular_dependency` |
 | `tools/teams.ts` | 11 | `team.create`, `team.run`, `team.status`, `team.results`, `team.cancel`, `team.list`, `team.history`, `team.logs`, `team.approve`, `team.reject`, `team.pending` |
+| `tools/catalog.ts` | 1 | `discover_tools`（见 2.3 节） |
+| `tools/intent.ts` | 1 | `match_tools`（见 2.4 节） |
 
 > 六类资产的 CRUD 遵循 `list_* / get_* / create_* / update_* / delete_*` 命名约定。
 
@@ -78,6 +80,57 @@
 | `vault.*` | 6 | `vault.init`, `vault.store`, `vault.get`, `vault.list`, `vault.delete`, `vault.audit` |
 
 > `vault.*` 工具定义在 `src/index.ts` 的增强块内（依赖 `src/security/`），因此同样只在增强模式下可用。
+
+---
+
+### 2.3 工具发现与分层暴露
+
+`tools/list` 默认只返回 22 个高频工具 + 两个始终暴露的元工具 `match_tools` / `discover_tools`（共 24 个）。其余工具**仍注册、仍可按原名调用**，只是不出现在列表中；这既减少模型的选择负担与上下文占用，也不破坏既有脚本。启动诊断输出形如 `Tool exposure: core — 24/76 tools in tools/list`。
+
+| 工具 | 参数 | 返回 |
+|---|---|---|
+| `discover_tools` | query?, group?, includeSchema?, limit?（1-100，默认 30） | `DiscoverResult`（按关键词 / 分组浏览） |
+| `match_tools` | intent（必填）, args?, limit?（1-20，默认 5）, includeSchema?, group?, execute?, useAi? | `MatchResult`（见 2.4 节，按自然语言意图路由） |
+
+- `query`：对工具名与描述做不区分大小写的子串匹配；`group`：只返回该分组（分组名取自注册模块，如 `evaluations` / `teams`；增强工具取 `.` 前缀，如 `vault`）；`includeSchema`：附带每个工具的 `inputSchema`。
+- `DiscoverResult`：`profile`（`core` / `full` / `custom`）、`exposedCount`、`totalTools`、`groups[]`（各分组 `total` / `exposed`）、`tools[]`（`name` / `group` / `description` / `exposed` / 可选 `inputSchema`）、`hint`。
+
+`AGENTX_TOOLS` 控制暴露范围（重启生效）：
+
+| 取值 | 行为 |
+|---|---|
+| 未设置 / `core` | 22 个核心工具 + 2 个元工具 |
+| `full` | 全部注册工具（增强模式下 114 个） |
+| `core,apply_evaluation_dsl,team.create` | 核心集追加指定工具（元工具始终包含） |
+| `list_skills,search_assets` | 仅暴露列出的工具（自动包含两个元工具） |
+
+未知工具名在启动时输出 `[catalog] Unknown tool in AGENTX_TOOLS: <name>` 并跳过。核心集定义见 `src/tools/catalog.ts` 的 `CORE_TOOLS`，元工具定义见同文件 `META_TOOLS`；其名称有效性与 README 声明的默认暴露数由 `scripts/verify-docs.mjs` 校验。
+
+### 2.4 意图路由（`match_tools`）
+
+把自然语言请求映射为排序后的工具候选。实现位于 `src/tools/intent.ts`，**默认纯本地、零依赖、不调用模型**。
+
+| 参数 | 类型 | 说明 |
+|---|---|---|
+| `intent` | string（必填） | 用户原话，中文或英文 |
+| `args` | object | 已知参数，用于推导 `missing` 与自动执行 |
+| `limit` | number | 候选数 1-20，默认 5 |
+| `group` | string | 限定候选分组 |
+| `includeSchema` | boolean | 附带 `inputSchema` |
+| `execute` | boolean | 高置信只读匹配自动执行，默认 `false` |
+| `useAi` | boolean | 用 `AGENTX_AI_API_KEY` 重排本地候选，默认 `false` |
+
+**匹配算法**：`tokenizeIntent()` 用中英双语动作 / 对象词典把输入归一为概念 token；`rankTools()` 对工具名 token（经 `TOKEN_TO_CONCEPT` 反向归一，使 `version_stats` 能命中「统计 / statistics」）、描述 token 与分组加权打分 —— 动作命中 10 分、对象 8 分、描述 2 分、分组 3 分，精确工具名 +30，名称编辑距离相似度 ≥0.75 额外加分，动作冲突 −8；最终按分数排序并给出 `confidence`（`high` ≥20 / `medium` ≥10 / `low`）与 `reasons[]`。中文别名按长度降序匹配（`评测集` → `evaluation`，不拆成 `评测` + `集`）。
+
+`MatchResult`：`intent`、`engine`（`local` / `local+ai`）、`autoSelect`、`selected?`、`matches[]`、`aiRerank?`、`executed?`、`refused?`、`hint`。
+`IntentMatch`：`name` / `group` / `description` / `score` / `confidence` / `reasons[]` / `exposed` / `required[]` / `missing[]` / `callTemplate` / 可选 `inputSchema`。
+`autoSelect` 条件：top1 ≥ 16 分且领先第二名 ≥ 4 分。
+
+**安全边界**：
+
+- `execute: true` 仅在 `autoSelect`、必填参数齐全、且工具命中只读白名单（`list_*` / `get_*` / `search_*` / `check_*` / `compare_*` / `detect_*` / `suggest_*` / `version_stats` / `evaluation_summary` / `team.status` 等）时真正调用，结果写入 `executed`；**写操作与元工具一律拒绝**，只返回 `callTemplate` 与 `refused`。执行器异常写入 `executed.error`，不丢弃匹配结果。
+- `useAi: true` 时通过 `AiProvider` 对本地 top-10 候选重排，返回名必须落在候选集内；无 provider 抛 `AiProviderNotConfiguredError`（不静默伪造），provider 报错则降级本地并置 `aiRerank.status = 'failed'`。本地打分始终保留，AI 只改变顺序。
+- `tools/call` 传入未知工具名时，错误 `suggestion` 会附上 `rankTools()` 的 top-3 候选，例如把 `list_promts` 纠正为 `list_prompts`。
 
 ---
 
@@ -313,11 +366,12 @@ SQLite（`better-sqlite3`，WAL 模式），`src/store/db.ts` 在 `initDb()` 中
 |---|---|---|
 | `AGENTX_DIR` | `~/.agentx` | 数据根目录 |
 | `AGENTX_ENHANCED` | `false` | 启用增强模块与工具 |
+| `AGENTX_TOOLS` | `core` | `tools/list` 暴露范围：`core` / `full` / 逗号分隔工具名（见 2.3 节）；`META_TOOLS` 始终暴露 |
 | `AGENTX_API_PORT` | `3000` | REST API 端口 |
 | `AGENTX_API_HOST` | `localhost` | REST API 监听地址 |
 | `AGENTX_API_KEY` | 未设置 | 启用 REST API 认证 |
 | `AGENTX_MONITOR_INTERVAL` | `5000` | 监控刷新间隔（ms） |
-| `AGENTX_AI_API_KEY` | 未设置 | 为 `TeamEngine` 与 `ai_*` 评测工具注入 OpenAI 兼容 provider；未设置时保持纯本地 |
+| `AGENTX_AI_API_KEY` | 未设置 | 为 `TeamEngine`、`ai_*` 评测工具及 `match_tools({ useAi: true })` 注入 OpenAI 兼容 provider；未设置时保持纯本地 |
 | `AGENTX_AI_BASE_URL` | `https://api.openai.com/v1` | 任意 OpenAI 兼容端点 |
 | `AGENTX_AI_MODEL` | `gpt-4o-mini` | 默认模型；单个工具可用 `model` 参数覆盖 |
 
@@ -333,4 +387,4 @@ SQLite（`better-sqlite3`，WAL 模式），`src/store/db.ts` 在 `initDb()` 中
 node scripts/verify-docs.mjs
 ```
 
-该脚本共 12 项校验：版本 / Node 徽章、工具数量与逐项覆盖、分组计数之和、CLI 命令数与文档表格、API 参考工具清单、AI 环境变量覆盖、工作流实现与文档一致，以及文档内所有本地 Markdown 链接。
+该脚本共 16 项校验：版本 / Node 徽章、工具数量与逐项覆盖、分组计数之和、CLI 命令数与文档表格、API 参考工具清单、AI 环境变量覆盖、工作流实现与文档一致、文档内所有本地 Markdown 链接，核心集与元工具名称有效性、README 默认暴露数一致性，以及意图路由的文档覆盖与「写操作不进入只读白名单」静态防线。

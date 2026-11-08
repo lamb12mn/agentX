@@ -20,6 +20,10 @@ import { registerEvaluationTools } from './tools/evaluations.js';
 import { registerExportTools } from './tools/export.js';
 import { registerDependencyTools } from './tools/dependencies.js';
 import { registerTeamTools } from './tools/teams.js';
+import { registerCatalogTools, resolveExposure, DISCOVER_TOOL, META_TOOLS } from './tools/catalog.js';
+import type { CatalogTool } from './tools/catalog.js';
+import { registerIntentTools, rankTools } from './tools/intent.js';
+import type { IntentContext } from './tools/intent.js';
 import { initTracing, traceToolCall } from './observability/index.js';
 import { diag } from './observability/diag.js';
 import { formatError, ErrorCode } from './utils/errors.js';
@@ -396,6 +400,50 @@ if (ENHANCED && getCacheStats && clearAssetCache && getSystemStats && pluginLoad
   Object.assign(allTools, enhancedTools);
 }
 
+// ---- Progressive tool exposure -------------------------------------------
+// Groups are derived from the registration source, so they cannot drift.
+const toolGroups: Record<string, string> = {};
+const registrations: Array<[string, object]> = [
+  ['skills', skillTools], ['agents', agentTools], ['prompts', promptTools],
+  ['rules', ruleTools], ['mcps', mcpTools], ['search', searchTools],
+  ['workflows', workflowTools], ['import', importTools], ['batch', batchTools],
+  ['clone', cloneTools], ['versions', versionTools], ['evaluations', evaluationTools],
+  ['export', exportTools], ['dependencies', dependencyTools], ['teams', teamTools],
+];
+for (const [group, tools] of registrations) {
+  for (const name of Object.keys(tools)) toolGroups[name] = group;
+}
+for (const name of Object.keys(allTools)) {
+  if (!toolGroups[name]) {
+    toolGroups[name] = name.includes('.') ? name.split('.')[0] : 'other';
+  }
+}
+for (const meta of META_TOOLS) toolGroups[meta] = 'catalog';
+
+const exposure = resolveExposure(Object.keys(allTools), process.env.AGENTX_TOOLS);
+for (const warning of exposure.warnings) diag(`[catalog] ${warning}`);
+const exposedTools = new Set<string>([...exposure.exposed, ...META_TOOLS]);
+
+// Both meta tools share one read-only view of the catalog plus a safe executor.
+// `allTools` is passed by reference so the catalog also sees the meta tools.
+const intentContext: IntentContext = {
+  tools: allTools as unknown as Record<string, CatalogTool>,
+  groups: toolGroups,
+  exposed: exposedTools,
+  invoke: async (name, args) => {
+    const handler = allTools[name];
+    if (!handler) throw new Error(`Unknown tool: ${name}`);
+    return traceToolCall(name, args, () => handler.handler(args as never));
+  },
+};
+Object.assign(allTools, registerCatalogTools({
+  tools: intentContext.tools,
+  groups: toolGroups,
+  exposed: exposedTools,
+  profile: exposure.profile,
+}));
+Object.assign(allTools, registerIntentTools(intentContext));
+
 const SERVER_VERSION = '2.0.1';
 
 const server = new Server(
@@ -404,25 +452,30 @@ const server = new Server(
 );
 
 server.setRequestHandler(ListToolsRequestSchema, async () => ({
-  tools: Object.entries(allTools).map(([name, tool]) => ({
-    name,
-    description: tool.description,
-    inputSchema: tool.inputSchema ?? { type: 'object' as const },
-  })),
+  tools: Object.entries(allTools)
+    .filter(([name]) => exposedTools.has(name))
+    .map(([name, tool]) => ({
+      name,
+      description: tool.description,
+      inputSchema: tool.inputSchema ?? { type: 'object' as const },
+    })),
 }));
 
+// Hidden tools stay callable by name — the exposure set only controls tools/list.
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args } = request.params;
   const tool = allTools[name];
   if (!tool) {
-    const availableTools = Object.keys(allTools).join(', ');
+    const candidates = rankTools(intentContext, { intent: name, limit: 3 })
+      .map(match => `${match.name} (${match.confidence})`);
+    const routed = candidates.length ? `Intent routing suggests: ${candidates.join(', ')}. ` : '';
     return {
       content: [{
         type: 'text' as const,
         text: formatError(`Unknown tool: ${name}`, {
           code: ErrorCode.INVALID_INPUT,
           tool: name,
-          suggestion: `Available tools: ${availableTools}`,
+          suggestion: `Unknown tool "${name}". ${routed}Call match_tools with the user's request for ranked candidates, or ${DISCOVER_TOOL} to browse all ${Object.keys(allTools).length} registered tools; hidden tools are callable by name, or set AGENTX_TOOLS=full to expose them all.`,
         }),
       }],
       isError: true,
@@ -511,10 +564,12 @@ async function main(): Promise<void> {
 
   // Diagnostics go to stderr — stdout belongs to the MCP JSON-RPC stream.
   diag(`AgentX MCP Server v2.0 running${ENHANCED ? ' (enhanced)' : ''}`);
-  if (ENHANCED) {
-    diag(`Base directory: ${baseDir}`);
-    diag(`Total tools available: ${Object.keys(allTools).length}`);
+  diag(`Tool exposure: ${exposure.profile} — ${exposedTools.size}/${Object.keys(allTools).length} tools in tools/list`);
+  diag('Intent routing: call match_tools with a natural-language request to find the right tool.');
+  if (exposure.profile !== 'full') {
+    diag(`Call ${DISCOVER_TOOL} to browse the full catalog; set AGENTX_TOOLS=full to expose every tool.`);
   }
+  if (ENHANCED) diag(`Base directory: ${baseDir}`);
 }
 
 function shutdown(): void {

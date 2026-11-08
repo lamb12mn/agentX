@@ -33,9 +33,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `when` 条件支持 `or` 与 `()` 分组（`and` 优先级更高）；新增轻量词法器 + 递归下降解析器，引号内的空格与 `and` / `or` 字样不再被误切
   - 导出 `parseCondition()` / `DslCondition`；`parseExpression()` 保留扁平 `and` 链视图以兼容既有调用，遇到 `or` / 括号时明确提示改用 `parseCondition()`
   - 括号不匹配、悬空逻辑词、未闭合引号、空分组均抛出明确错误；新增 4 个测试用例（含 1 条端到端写库）
+- 工具分层暴露与按需发现（第 8 轮迭代，解决默认 74/112 个工具难以选择）：
+  - 新增 `src/tools/catalog.ts`：`CORE_TOOLS` 22 个高频工具、`resolveExposure()`、`searchCatalog()` 与始终暴露的 `discover_tools`（按关键词 / 分组检索全量目录，可附带 `inputSchema`）
+  - `tools/list` 默认只返回 23 个工具；隐藏工具**仍可按原名直接调用**，零能力损失、既有脚本不受影响；未知工具的错误提示改为引导 `discover_tools`
+  - `AGENTX_TOOLS` 支持 `core`（默认）/ `full` / 逗号分隔工具名（可含 `core` 追加），未知名称启动告警；分组元数据由注册器自动推导，无需手工维护
+  - 新增 7 个目录层单测与 3 个 MCP 客户端集成测试（实测默认 23/75、`full` 75/75、隐藏工具可调用）；文档校验新增核心集名称与默认暴露数一致性检查（共 14 项）
+- 自然语言意图路由（第 9 轮迭代，让模型不必再猜工具名）：
+  - 新增 `src/tools/intent.ts`：中英双语动作 / 对象词典 + `TOKEN_TO_CONCEPT` 反向归一（使 `version_stats` 能命中「统计 / statistics」），加权打分（工具名 > 描述 > 分组），支持中文长词优先、精确工具名、拼写近似（`list_promts` → `list_prompts`）与动作冲突惩罚；纯本地、零依赖、不调用模型
+  - 新增始终暴露的 `match_tools`：返回排序候选（`score` / `confidence` / `reasons` / `required` / `missing` / `callTemplate`）、`autoSelect` 与可选 `inputSchema`；`discover_tools` 保留为关键词 / 分组浏览
+  - `execute: true` 仅在意图明确、必填参数齐全且命中只读白名单时自动执行；写操作与元工具一律拒绝，只返回调用草案。`useAi: true` 可选模型重排（无 key 明确报错、模型失败降级本地），AI 只改顺序不改本地分数
+  - `tools/call` 未知工具名的错误提示附上意图匹配 top-3 具体候选；`tools/list` 默认暴露 24 个（22 核心 + 2 元工具），`AGENTX_TOOLS` 行为不变
+  - 新增 18 个意图层单测与 2 个真实 MCP 客户端集成用例；文档校验新增元工具有效性与「写操作不进入只读白名单」静态防线（共 16 项）
 
 ### Changed
 
+- 工具暴露文档：README / API_REFERENCE 同步为 76 个基础工具（合计 114）、默认暴露 24 个，新增 `AGENTX_TOOLS`、2.4 节「意图路由」与 `META_TOOLS` 说明；顺带修正 API_REFERENCE 遗留的「72 个唯一工具名」漂移
 - README / API_REFERENCE: 工具数同步为 74 个基础工具 + 38 个增强工具（合计 112）、14 个评测工具、26 个顶层 CLI 命令；补入 AI 环境变量、DSL 语法、AI 边界、数据集扩充与新版本落地说明
 - scripts: `verify-docs.mjs` 增加 AI 环境变量覆盖与 `not_implemented` 残留校验（共 12 项）
 - MCP 层错误响应：在通用建议中附带真实错误原因，避免 `AiProviderNotConfiguredError` 等具体信息被固定标题吞掉

@@ -173,11 +173,11 @@ AgentX 可以作为 MCP 服务器运行，供 Claude Code 调用。
 
 **配置说明**：
 - `command`: 可以是 `agentx-mcp`（全局安装）或 `node /path/to/dist/index.js`（本地路径）
-- 启动后，Claude Code 会自动发现并调用 AgentX 注册的全部工具（完整清单以运行时 `tools/list` 为准）
+- 启动后，Claude Code 默认只看到 22 个高频工具与 2 个元工具（`match_tools` / `discover_tools`）；不确定用哪个工具时把用户原话交给 `match_tools`，隐藏工具仍可按原名直接调用（完整清单见 [docs/API_REFERENCE.md](docs/API_REFERENCE.md)）
 
 #### 可用工具列表
 
-当前基础模式注册 **74 个工具**（15 个注册模块）；设置 `AGENTX_ENHANCED=true` 后额外注册 **38 个增强工具**，合计 112 个。工具名与 `inputSchema` 以运行时 `tools/list` 为准，逐项说明见 [docs/API_REFERENCE.md](docs/API_REFERENCE.md)。
+当前基础模式注册 **76 个工具**（17 个注册模块）；设置 `AGENTX_ENHANCED=true` 后额外注册 **38 个增强工具**，合计 114 个。**默认只在 `tools/list` 暴露 24 个**（22 个核心工具 + `match_tools` + `discover_tools`），其余工具仍可按原名直接调用；设置 `AGENTX_TOOLS=full` 可恢复全量暴露。工具名与 `inputSchema` 以运行时 `tools/list` 为准，逐项说明见 [docs/API_REFERENCE.md](docs/API_REFERENCE.md)。
 
 **资产 CRUD**（30 个）：`skills | prompts | rules | mcps | workflows | agents` 六类各提供 `list_*`、`get_*`、`create_*`、`update_*`、`delete_*`。
 
@@ -191,9 +191,39 @@ AgentX 可以作为 MCP 服务器运行，供 Claude Code 调用。
 
 **团队编排**（11 个）：`team.create`、`team.run`、`team.status`、`team.results`、`team.cancel`、`team.list`、`team.history`、`team.logs`、`team.approve`、`team.reject`、`team.pending`。
 
+**工具发现与意图路由**（2 个）：`match_tools`（自然语言意图 → 排序后的工具候选，始终暴露）、`discover_tools`（按关键词 / 分组检索全部工具，始终暴露）。
+
 **增强模式追加**（38 个）：`cache.*`（2）、`system.stats`（1）、`plugins.*`（4）、`sync.*`（5）、`ai.*`（4）、`api.*`（3）、`monitor.*`（4）、`editor.*`（6）、`ui.mobile.*`（3）、`vault.*`（6）。
 
 > 基础工具实现位于 `agentx-mcp/src/tools/`，增强工具定义在 `agentx-mcp/src/index.ts`；两者均由 `src/index.ts` 汇总注册。
+
+**工具分层暴露（默认生效）**
+
+`tools/list` 默认只返回 22 个高频工具 + 两个元工具（`match_tools`、`discover_tools`），共 24 个。其余工具**仍注册、仍可按原名调用**，只是不出现在列表中，因此既有脚本与集成不会失效。
+
+**不确定用哪个工具时，直接用 `match_tools`**——把用户原话（中文或英文）传进去即可，无需猜工具名：
+
+```json
+{ "name": "match_tools", "arguments": { "intent": "帮我看看有哪些提示词" } }
+{ "name": "match_tools", "arguments": { "intent": "roll back to the previous version", "limit": 3 } }
+{ "name": "match_tools", "arguments": { "intent": "列出所有提示词", "execute": true } }
+```
+
+返回 `matches[]`（`name` / `group` / `score` / `confidence` / `reasons[]` / `exposed` / `required` / `missing` / `callTemplate`），以及 `autoSelect` 与 `selected`。匹配为**纯本地**的中英双语动作 / 对象词典 + 加权打分（工具名 > 描述 > 分组），支持精确工具名、拼写近似（`list_promts` → `list_prompts`）与动作冲突惩罚；无网络调用、无新依赖。拿回名字后按原名调用即可，隐藏工具不需要先启用。
+
+- `execute: true`：仅当意图明确（`autoSelect`）、必填参数齐全、且工具属于只读白名单（`list_*` / `get_*` / `search_*` / `check_*` / `compare_*` / `version_stats` / `evaluation_summary` / `team.status` 等）时才自动执行并返回 `executed`；**写操作一律拒绝自动执行**，只返回 `callTemplate` 与 `refused` 原因。
+- `useAi: true`：可选地用 `AGENTX_AI_API_KEY` 对应模型对本地候选重排（未配置时明确报 `AiProviderNotConfiguredError`；模型报错则降级为本地结果并标注 `aiRerank.status = 'failed'`）。默认关闭，不影响本地路径。
+- `discover_tools` 适合按关键词 / 分组浏览：`{ "group": "evaluations", "includeSchema": true }`；其 `groups` 字段给出各分组总数与已暴露数。
+- `tools/call` 传入不存在的工具名时，错误提示会附上意图匹配出的 top-3 具体候选，而不是只让你去翻目录。
+
+`AGENTX_TOOLS` 控制暴露范围（重启生效，未知名称会在启动时告警并跳过）：
+
+| 取值 | 效果 |
+|---|---|
+| `core`（默认） | 22 个核心工具 + 2 个元工具 |
+| `full` | 全部 76 个基础工具（增强模式下 114 个） |
+| `core,apply_evaluation_dsl,team.create` | 核心集追加指定工具（元工具始终包含） |
+| `list_skills,search_assets` | 只暴露列出的工具（自动包含两个元工具） |
 
 ---
 
@@ -666,7 +696,7 @@ npm update -g agentx-mcp
 
 **⭐ 如果这个项目对您有帮助，请给我们一个 Star！**
 
-*最后更新：2026-11-07*
+*最后更新：2026-11-08*
 
 ### 环境变量配置
 
@@ -674,11 +704,12 @@ npm update -g agentx-mcp
 |---|---|---|
 | `AGENTX_DIR` | `~/.agentx` | 自定义数据存储根目录（SQLite `agentx.db` + 资产文件） |
 | `AGENTX_ENHANCED` | `false` | 设为 `true` 启用增强模块与 38 个增强工具 |
+| `AGENTX_TOOLS` | `core` | 控制 `tools/list` 暴露范围：`core` / `full` / 逗号分隔工具名（可含 `core` 追加）；`match_tools` 与 `discover_tools` 始终暴露，隐藏工具仍可直接调用 |
 | `AGENTX_API_PORT` | `3000` | REST API 端口（增强模式） |
 | `AGENTX_API_HOST` | `localhost` | REST API 监听地址（增强模式） |
 | `AGENTX_API_KEY` | 未设置 | 设置后启用 REST API 认证；未设置时认证关闭并输出警告 |
 | `AGENTX_MONITOR_INTERVAL` | `5000` | 监控面板刷新间隔（ms，增强模式） |
-| `AGENTX_AI_API_KEY` | 未设置 | 设置后为 `TeamEngine` 与 AI 评测工具注入 OpenAI 兼容 provider；未设置时保持纯本地 |
+| `AGENTX_AI_API_KEY` | 未设置 | 设置后为 `TeamEngine`、AI 评测工具及 `match_tools({ useAi: true })` 注入 OpenAI 兼容 provider；未设置时保持纯本地 |
 | `AGENTX_AI_BASE_URL` | `https://api.openai.com/v1` | 任意 OpenAI 兼容端点（如本地 Ollama） |
 | `AGENTX_AI_MODEL` | `gpt-4o-mini` | 默认模型名，工具可用 `model` 参数覆盖 |
 
